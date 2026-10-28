@@ -17,7 +17,7 @@ Diferente de um agente que quer substituir os outros, o LEA deixa cada agente
 continuar sendo ele mesmo e fica **entre** eles, como camada de memória e
 supervisão. Ver [docs/estudo-hermes.md](docs/estudo-hermes.md).
 
-## Estado: Fases 1 e 2 concluídas
+## Estado: Fases 1 a 3 concluídas
 
 O núcleo é um **daemon headless** com API local, WebSocket de eventos e receptor
 de hooks. A interface é um cliente dele — é o que permite rodar sem janela num
@@ -27,7 +27,7 @@ homelab e trocar a camada visual sem mexer no produto.
 |---|---|
 | ✅ Fase 1 | núcleo: config, banco com migrações, barramento de eventos, CLI, tokens locais, scanner de injeção |
 | ✅ Fase 2 | memória: wiki git, busca FTS, decaimento, grafo, injeção de contexto, servidor MCP |
-| ⬜ Fase 3 | projetos, launcher, harnesses, PTY, worktrees |
+| ✅ Fase 3 | projetos, launcher, adaptadores de harness, hooks, PTY, worktrees |
 | ⬜ Fase 4 | handoffs |
 | ⬜ Fase 5 | lea-agent, skills, cron |
 | ⬜ Fase 6 | canais de mensagem |
@@ -43,7 +43,7 @@ Requer Python 3.12+ e [uv](https://docs.astral.sh/uv/).
 uv sync --extra dev
 uv run lea doctor      # confere instalação, permissões e banco
 uv run lea daemon      # sobe o núcleo em 127.0.0.1:7420
-uv run pytest          # 121 testes
+uv run pytest          # 156 testes
 ```
 
 `lea doctor` numa instalação limpa cria `~/.lea/` (config, banco, wiki, skills,
@@ -54,10 +54,66 @@ worktrees, logs), com os diretórios em `0700` e os tokens em `0600`.
 ```
 lea daemon    sobe o núcleo, sem janela (serve para homelab)
 lea hook      ponte chamada de dentro dos agentes de código
-lea mcp       servidor MCP lea.memory, por stdio
-lea reindex   reconstrói o índice da memória a partir do git
-lea doctor    diagnostica a instalação
+lea mcp        servidor MCP lea.memory, por stdio
+lea harnesses  matriz de integração dos agentes; --install para configurar
+lea reindex    reconstrói o índice da memória a partir do git
+lea doctor     diagnostica a instalação
 ```
+
+## Agentes de código
+
+```
+$ lea harnesses
+agente          versão                 hooks  mcp  observação
+CC Claude Code  2.1.278 (Claude Code)  ●      ●
+CX Codex CLI    codex-cli 0.164.0      ◐      ●    1 hook aguardando confiança
+```
+
+`lea harnesses --install claude-code` registra os hooks de ciclo de vida
+(`SessionStart`, `PostToolUse`, `PreCompact`, `Stop`) e o servidor MCP de
+memória.
+
+**Isso altera a configuração de outra ferramenta na sua máquina**, então é um
+comando explícito e nunca roda sozinho. Antes de tocar em qualquer arquivo o
+LEA faz backup, e a escrita é sempre **merge**: hooks de outras ferramentas que
+já estavam ali continuam funcionando. Rodar duas vezes não duplica nada.
+
+Formatos conferidos contra instalações reais em 2026-10-28, porque mudam com
+frequência:
+
+| | Hooks | MCP |
+|---|---|---|
+| Claude Code | `~/.claude/settings.json`, chave `hooks` | `claude mcp add --scope user` |
+| Codex CLI | `~/.codex/hooks.json` | `codex mcp add` |
+
+O Codex exige **confiar** em cada hook novo antes de executá-lo (há um
+`trusted_hash` por hook em `config.toml`). O LEA não forja esse hash nem sugere
+`--dangerously-bypass-hook-trust`: ele instala e avisa que o Codex vai perguntar
+na próxima execução.
+
+## Sessões
+
+`POST /api/sessions` inicia um agente e devolve a sequência de boot que o
+console desenha linha a linha:
+
+```
+✓ comando:   claude "padronizar os testes"
+✓ worktree:  ~/.lea/worktrees/s-7d06 (lea/s-7d06)
+✓ hooks:     ok · mcp ok
+✓ memória:   3 página(s) · 1.204 tokens
+✓ sessão:    ativa · pid 2422616
+```
+
+O agente roda sob **PTY de verdade** — sem TTY eles desligam cor e modo
+interativo. A saída vai por WebSocket em `/api/sessions/{id}/pty` como bytes
+crus, e quem conecta depois recebe o histórico para não abrir num terminal em
+branco.
+
+Controles: `pause` (SIGSTOP), `resume`, `stop` (SIGTERM → SIGKILL) e `input`.
+Os sinais vão ao **grupo** de processos, então o `npm test` que o agente abriu
+não fica órfão. Com `use_worktree`, cada sessão ganha diretório e branch
+próprios — e a worktree **não é apagada** no fim, porque pode haver trabalho não
+commitado lá dentro.
 
 ## Memória
 

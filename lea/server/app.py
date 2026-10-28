@@ -19,8 +19,10 @@ Para o LEA isso resolve três coisas de uma vez:
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
 from collections.abc import AsyncIterator
+from datetime import datetime, timezone
 from typing import Annotated, Any
 
 import aiosqlite
@@ -32,7 +34,8 @@ from lea.db import session as db
 from lea.memory import Memory
 from lea.memory.inject import render as render_context
 from lea.security import tokens
-from lea.server import memory_routes
+from lea.server import memory_routes, session_routes
+from lea.sessions.launcher import Launcher
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +45,22 @@ UI_TOKEN_HEADER = "X-Lea-Token"
 #: Cabeçalho que carrega o token dos hooks. Separado do da UI de propósito.
 HOOK_TOKEN_HEADER = "X-Lea-Hook-Token"
 
-#: Eventos de ciclo de vida que um harness pode relatar.
-HOOK_EVENTS = frozenset({"SessionStart", "PostToolUse", "PreCompact", "Stop"})
+#: Eventos de ciclo de vida que um harness relata -> tipo gravado em `events`.
+#: O vocabulário da coluna é fechado por CHECK, então o mapa é o que impede um
+#: nome de hook novo virar erro de constraint em tempo de execução.
+_HOOK_EVENT_TYPES = {
+    "SessionStart": "session_start",
+    "PostToolUse": "tool_call",
+    "PreCompact": "memory",
+    "Stop": "session_end",
+}
+
+HOOK_EVENTS = frozenset(_HOOK_EVENT_TYPES)
+
+
+async def _session_exists(conn: aiosqlite.Connection, session_id: str) -> bool:
+    async with conn.execute("SELECT 1 FROM sessions WHERE id = ?", (session_id,)) as cursor:
+        return await cursor.fetchone() is not None
 
 
 @contextlib.asynccontextmanager
@@ -65,6 +82,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     await memory.setup()
     app.state.memory = memory
+    app.state.launcher = Launcher(app.state.db, memory, events.bus)
 
     status.prime()
 
@@ -79,6 +97,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        # Ordem importa: as sessões param (e suas tasks de PTY morrem) antes
+        # de o banco fechar. Ao contrário, cada sessão viva registra um
+        # "no active connection" na saída.
+        await app.state.launcher.shutdown()
         events.bus.emit("session_end", {"scope": "daemon"})
         await app.state.db.close()
 
@@ -211,11 +233,32 @@ async def receive_hook(event_name: str, request: Request) -> dict[str, Any]:
     session_id = payload.get("session_id")
     session_id = session_id if isinstance(session_id, str) else None
 
-    request.app.state.bus.emit(
-        "session_start" if event_name == "SessionStart" else "tool_call",
-        {"hook": event_name, **payload},
-        session_id=session_id,
-    )
+    event_type = _HOOK_EVENT_TYPES[event_name]
+    body = {"hook": event_name, **payload}
+
+    # Persistimos só o que pertence a uma sessão conhecida nossa. Um hook de
+    # uma sessão que o usuário abriu no terminal, fora do LEA, continua
+    # aparecendo no feed ao vivo, mas não vira linha órfã no banco -- a
+    # foreign key recusaria, e o evento não tem a quem pertencer.
+    if session_id and await _session_exists(request.app.state.db, session_id):
+        await request.app.state.db.execute(
+            "INSERT INTO events (session_id, at, type, payload_json) VALUES (?, ?, ?, ?)",
+            (
+                session_id,
+                datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                event_type,
+                json.dumps(body, ensure_ascii=False),
+            ),
+        )
+        if event_name == "Stop":
+            await request.app.state.db.execute(
+                "UPDATE sessions SET status = 'ended', ended_at = ? WHERE id = ? "
+                "AND status NOT IN ('ended', 'handoff')",
+                (datetime.now(timezone.utc).isoformat(timespec="seconds"), session_id),
+            )
+        await request.app.state.db.commit()
+
+    request.app.state.bus.emit(event_type, body, session_id=session_id)
 
     response: dict[str, Any] = {"ok": True, "event": event_name}
 
@@ -237,3 +280,7 @@ async def receive_hook(event_name: str, request: Request) -> dict[str, Any]:
 
 # Rotas de memória: tela Memória, launcher e manutenção do índice.
 app.include_router(memory_routes.router, dependencies=[Depends(require_ui_token)])
+
+# Projetos, harnesses e sessões. O WebSocket do terminal autentica por conta
+# própria (query string), então fica fora da dependência de cabeçalho.
+app.include_router(session_routes.router, dependencies=[Depends(require_ui_token)])

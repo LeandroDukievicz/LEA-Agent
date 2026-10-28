@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import sys
 from typing import Annotated
 
@@ -105,6 +106,18 @@ def hook(
         payload = json.loads(raw) if raw.strip() else {}
     except json.JSONDecodeError:
         payload = {"raw": raw}
+    if not isinstance(payload, dict):
+        payload = {"raw": payload}
+
+    # O harness manda o id de sessão *dele*. O nosso viaja pelo ambiente que
+    # o launcher injetou no processo do agente, e o hook herda daí -- é o que
+    # liga um evento de tool use à sessão que a interface está mostrando.
+    lea_session = os.environ.get("LEA_SESSION_ID")
+    if lea_session:
+        payload["harness_session_id"] = payload.get("session_id")
+        payload["session_id"] = lea_session
+    if os.environ.get("LEA_PROJECT"):
+        payload.setdefault("project", os.environ["LEA_PROJECT"])
 
     config = load()
     url = f"http://{config.server.host}:{config.server.port}/hooks/{event}"
@@ -168,6 +181,71 @@ async def _reindex() -> None:
         err_console.print(f"\n[yellow]{len(problems)} página(s) com problema:[/]")
         for item in problems:
             err_console.print(f"  {item}")
+
+
+@app.command(name="harnesses")
+def harnesses_(
+    install: Annotated[
+        str | None,
+        typer.Option("--install", help="Instala no harness indicado (ex.: claude-code)."),
+    ] = None,
+) -> None:
+    """Mostra a matriz de integração dos agentes de código, ou instala num deles.
+
+    Instalar **altera a configuração de outra ferramenta** na sua máquina.
+    Por isso é um comando explícito e nunca acontece sozinho: fazemos backup
+    antes, mesclamos em vez de sobrescrever, e listamos o que mudou.
+    """
+    asyncio.run(_harnesses(install))
+
+
+async def _harnesses(install: str | None) -> None:
+    from lea import harnesses as hz
+
+    if install:
+        harness = hz.get(install)
+        if harness is None:
+            conhecidos = ", ".join(h.id for h in hz.all_harnesses())
+            err_console.print(f"[red]harness desconhecido:[/] {install} (use: {conhecidos})")
+            raise typer.Exit(2)
+
+        console.print(f"instalando em [cyan]{harness.name}[/]…")
+        report = await harness.install(hz.hook_command(), hz.mcp_command())
+
+        for item in report.changed:
+            console.print(f"  [green]+[/] {item}")
+        for item in report.unchanged:
+            console.print(f"  [dim]=[/] {item} (já estava)")
+        for item in report.backups:
+            console.print(f"  [dim]backup:[/] {item}")
+        for item in report.manual_steps:
+            console.print(f"  [yellow]ação sua:[/] {item}")
+        for item in report.problems:
+            err_console.print(f"  [red]![/] {item}")
+
+        raise typer.Exit(0 if report.ok else 1)
+
+    hook_command = hz.hook_command()
+    table = Table(show_header=True, header_style="bold cyan", box=None, pad_edge=False)
+    for column in ("agente", "versão", "hooks", "mcp", "observação"):
+        table.add_column(column, overflow="fold")
+
+    for harness in hz.all_harnesses():
+        state = await harness.status(hook_command)
+        if not state.installed:
+            table.add_row(f"{state.code} {state.name}", "—", "—", "—", "não instalado")
+            continue
+        table.add_row(
+            f"{state.code} {state.name}",
+            state.version,
+            hz.Health(state.hooks).glyph,
+            hz.Health(state.mcp).glyph,
+            "; ".join(state.notes) or "",
+        )
+
+    console.print(table)
+    console.print("\n[dim]● ok  ◐ incompleto  ○ ausente[/]")
+    console.print("[dim]instalar:[/] lea harnesses --install claude-code")
 
 
 @app.command()
