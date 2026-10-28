@@ -29,7 +29,10 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request, WebSocket,
 from lea import __version__, events, paths, status
 from lea.config import Config, load
 from lea.db import session as db
+from lea.memory import Memory
+from lea.memory.inject import render as render_context
 from lea.security import tokens
+from lea.server import memory_routes
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +57,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.db = await db.connect()
     app.state.ui_token = tokens.ui_token()
     app.state.hook_token = tokens.hook_token()
+
+    memory = Memory(
+        app.state.db,
+        config.memory.wiki_path,
+        half_lives=config.memory.half_life_days.model_dump(),
+    )
+    await memory.setup()
+    app.state.memory = memory
 
     status.prime()
 
@@ -183,9 +194,9 @@ async def receive_hook(event_name: str, request: Request) -> dict[str, Any]:
     """Recebe um evento de ciclo de vida de um harness.
 
     Quem chama é o comando ``lea hook``, rodando dentro do processo do agente
-    de código. Nesta fase o evento só é publicado no barramento; o tratamento
-    por tipo (injetar memória no ``SessionStart``, gerar handoff no ``Stop``)
-    chega na Fase 3, junto com os adaptadores.
+    de código. Todo evento é publicado no barramento; o ``SessionStart``
+    também devolve o bloco de memória a injetar. O ``Stop`` passa a gerar
+    handoff na Fase 4.
     """
     if event_name not in HOOK_EVENTS:
         raise HTTPException(status_code=404, detail=f"evento desconhecido: {event_name}")
@@ -198,9 +209,31 @@ async def receive_hook(event_name: str, request: Request) -> dict[str, Any]:
         payload = {"raw": payload}
 
     session_id = payload.get("session_id")
+    session_id = session_id if isinstance(session_id, str) else None
+
     request.app.state.bus.emit(
         "session_start" if event_name == "SessionStart" else "tool_call",
         {"hook": event_name, **payload},
-        session_id=session_id if isinstance(session_id, str) else None,
+        session_id=session_id,
     )
-    return {"ok": True, "event": event_name}
+
+    response: dict[str, Any] = {"ok": True, "event": event_name}
+
+    if event_name == "SessionStart":
+        # O agente que está subindo recebe o bloco de memória para injetar.
+        # É o momento em que a wiki vira contexto de uma sessão nova.
+        memory: Memory = request.app.state.memory
+        config: Config = request.app.state.config
+        selection = await memory.context_for(
+            project_id=payload.get("project_id"),
+            task=str(payload.get("task") or ""),
+            budget_tokens=config.memory.inject_budget_tokens,
+        )
+        response["context"] = render_context(selection)
+        response["memory"] = selection.as_dict()
+
+    return response
+
+
+# Rotas de memória: tela Memória, launcher e manutenção do índice.
+app.include_router(memory_routes.router, dependencies=[Depends(require_ui_token)])

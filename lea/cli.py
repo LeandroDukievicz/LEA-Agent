@@ -125,9 +125,49 @@ def hook(
 
 @app.command()
 def mcp() -> None:
-    """Servidor MCP ``lea.memory`` por stdio. Chega na Fase 2."""
-    err_console.print("[yellow]ainda não implementado[/] — previsto para a Fase 2 (Memória).")
-    raise typer.Exit(1)
+    """Servidor MCP ``lea.memory`` por stdio, para os agentes de código.
+
+    O stdout é o canal do protocolo: nada pode ser impresso nele além das
+    mensagens MCP, ou o cliente do outro lado perde o enquadramento.
+    """
+    from lea.mcp_server import run
+
+    paths.ensure_layout()
+    logging.getLogger().handlers.clear()
+    logging.basicConfig(
+        level=logging.WARNING,
+        stream=sys.stderr,
+        format="%(levelname)s %(name)s: %(message)s",
+    )
+    asyncio.run(run())
+
+
+@app.command()
+def reindex() -> None:
+    """Reconstrói o índice da memória a partir do git.
+
+    Use depois de editar a wiki à mão, de um `git pull` ou se a busca
+    parecer desatualizada. É seguro: o git é a fonte da verdade, e o
+    histórico de acessos é preservado.
+    """
+    asyncio.run(_reindex())
+
+
+async def _reindex() -> None:
+    from lea.memory import Memory
+
+    paths.ensure_layout()
+    config = load()
+    async with db.connection() as conn:
+        memory = Memory(conn, config.memory.wiki_path)
+        result = await memory.reindex()
+
+    console.print(f"[green]{result['indexed']}[/] página(s) indexada(s).")
+    problems = result["problems"]
+    if isinstance(problems, list) and problems:
+        err_console.print(f"\n[yellow]{len(problems)} página(s) com problema:[/]")
+        for item in problems:
+            err_console.print(f"  {item}")
 
 
 @app.command()
