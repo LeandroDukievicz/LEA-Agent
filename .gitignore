@@ -10,3 +10,6 @@ Thumbs.db
 # Ambiente
 .env
 .env.*
+
+# Artefatos de teste de browser
+.playwright-mcp/
