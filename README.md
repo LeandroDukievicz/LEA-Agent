@@ -43,7 +43,14 @@ Requer Python 3.12+ e [uv](https://docs.astral.sh/uv/).
 uv sync --extra dev
 uv run lea doctor      # confere instalação, permissões e banco
 uv run lea daemon      # sobe o núcleo em 127.0.0.1:7420
-uv run pytest          # 179 testes
+uv run pytest          # 206 testes (unidade + aceite)
+```
+
+Testes de aceite exercitam o LEA pela borda — HTTP, WebSocket, MCP por stdio,
+processos reais sob PTY — e verificam o critério de cada fase:
+
+```bash
+uv run pytest tests/acceptance -q
 ```
 
 `lea doctor` numa instalação limpa cria `~/.lea/` (config, banco, wiki, skills,
@@ -229,6 +236,15 @@ Telas: Overview, Projetos, Console, Memória, Skills, Histórico & Handoffs,
 Automações, Canais & Agentes.
 
 Interface em português do Brasil; código, tabelas e APIs em inglês.
+
+## Documentação
+
+- [docs/arquitetura.md](docs/arquitetura.md) — decisões, fonte da verdade,
+  API completa e invariantes que o código assume
+- [docs/estudo-hermes.md](docs/estudo-hermes.md) — o que foi aprendido do
+  Hermes Agent e o que fazemos diferente
+- [CHANGELOG.md](CHANGELOG.md) — o que entrou em cada fase, com os bugs
+  encontrados e os desvios da especificação
 
 ## Licença
 
