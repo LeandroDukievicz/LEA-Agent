@@ -218,7 +218,12 @@ class Memory:
         return await index.apply_decay(self.conn, self.half_lives)
 
     async def context_for(
-        self, *, project_id: int | None = None, task: str = "", budget_tokens: int = 8000
+        self,
+        *,
+        project_id: int | None = None,
+        task: str = "",
+        budget_tokens: int = 8000,
+        pinned: list[str] | None = None,
     ) -> inject.Selection:
         """Escolhe o que injetar numa sessão nova."""
         return await inject.select(
@@ -227,6 +232,7 @@ class Memory:
             project_id=project_id,
             task=task,
             budget_tokens=budget_tokens,
+            pinned=pinned,
         )
 
     # ── internos ─────────────────────────────────────────────────────────

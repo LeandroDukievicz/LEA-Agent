@@ -32,9 +32,10 @@ from lea import __version__, events, paths, status
 from lea.config import Config, load
 from lea.db import session as db
 from lea.memory import Memory
+from lea import handoffs
 from lea.memory.inject import render as render_context
 from lea.security import tokens
-from lea.server import memory_routes, session_routes
+from lea.server import handoff_routes, memory_routes, session_routes
 from lea.sessions.launcher import Launcher
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,32 @@ HOOK_EVENTS = frozenset(_HOOK_EVENT_TYPES)
 async def _session_exists(conn: aiosqlite.Connection, session_id: str) -> bool:
     async with conn.execute("SELECT 1 FROM sessions WHERE id = ?", (session_id,)) as cursor:
         return await cursor.fetchone() is not None
+
+
+async def _handoff_on_stop(request: Request, session_id: str) -> dict[str, Any] | None:
+    """Gera o handoff quando uma sessão encerra.
+
+    Falhar aqui nunca propaga: quem está do outro lado é o agente de código
+    terminando, e um erro nosso não pode virar erro de hook na sessão dele.
+    """
+    try:
+        handoff = await handoffs.generate(
+            request.app.state.db,
+            request.app.state.memory,
+            session_id,
+            model=request.app.state.config.agent.default_model,
+            reason="sessão encerrada pelo agente",
+        )
+    except Exception:
+        logger.exception("não consegui gerar o handoff de %s", session_id)
+        return None
+
+    request.app.state.bus.emit(
+        "session_end",
+        {"handoff": handoff.id, "title": handoff.title},
+        session_id=session_id,
+    )
+    return handoff.as_dict()
 
 
 @contextlib.asynccontextmanager
@@ -235,6 +262,7 @@ async def receive_hook(event_name: str, request: Request) -> dict[str, Any]:
 
     event_type = _HOOK_EVENT_TYPES[event_name]
     body = {"hook": event_name, **payload}
+    response_handoff: dict[str, Any] | None = None
 
     # Persistimos só o que pertence a uma sessão conhecida nossa. Um hook de
     # uma sessão que o usuário abriu no terminal, fora do LEA, continua
@@ -258,9 +286,16 @@ async def receive_hook(event_name: str, request: Request) -> dict[str, Any]:
             )
         await request.app.state.db.commit()
 
+        if event_name == "Stop":
+            handoff = await _handoff_on_stop(request, session_id)
+            if handoff:
+                response_handoff = handoff
+
     request.app.state.bus.emit(event_type, body, session_id=session_id)
 
     response: dict[str, Any] = {"ok": True, "event": event_name}
+    if response_handoff is not None:
+        response["handoff"] = response_handoff
 
     if event_name == "SessionStart":
         # O agente que está subindo recebe o bloco de memória para injetar.
@@ -283,4 +318,8 @@ app.include_router(memory_routes.router, dependencies=[Depends(require_ui_token)
 
 # Projetos, harnesses e sessões. O WebSocket do terminal autentica por conta
 # própria (query string), então fica fora da dependência de cabeçalho.
+# Handoffs ANTES de sessões: `/api/sessions/{id}/handoff` precisa ser casada
+# antes de `/api/sessions/{id}/{action}`, que capturaria "handoff" como ação
+# desconhecida. O FastAPI casa na ordem de registro.
+app.include_router(handoff_routes.router, dependencies=[Depends(require_ui_token)])
 app.include_router(session_routes.router, dependencies=[Depends(require_ui_token)])

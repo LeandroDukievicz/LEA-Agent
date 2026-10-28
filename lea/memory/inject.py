@@ -124,15 +124,30 @@ async def select(
     project_id: int | None = None,
     task: str = "",
     budget_tokens: int = 8000,
+    pinned: list[str] | None = None,
 ) -> Selection:
-    """Escolhe as páginas que cabem no orçamento, em ordem determinística."""
+    """Escolhe as páginas que cabem no orçamento, em ordem determinística.
+
+    ``pinned`` são caminhos que entram antes de tudo e com o orçamento
+    cheio -- é por onde o handoff assumido chega ao contexto de quem o
+    assume. Um handoff que não coubesse por causa de preferência global
+    inverteria a prioridade do que a sessão existe para fazer.
+    """
     selection = Selection(budget=budget_tokens)
     stable_budget = int(budget_tokens * STABLE_SHARE)
 
     chosen: dict[str, Selected] = {}
 
+    # 0. Fixadas: o handoff que esta sessão veio assumir.
+    for path in pinned or []:
+        page = _safe_read(wiki, path if path.endswith(".md") else f"{path}.md")
+        if page:
+            _consider(chosen, selection, page, "handoff assumido", budget_tokens, stable=True)
+
     # 1. Prefixo estável: preferências globais, depois as hot do projeto.
     for page, reason in await _stable_candidates(conn, wiki, project_id):
+        if page.id in chosen:
+            continue
         _consider(chosen, selection, page, reason, stable_budget, stable=True)
 
     # 2. Cauda volátil: o que a tarefa pede.
@@ -145,7 +160,8 @@ async def select(
     # Estável primeiro e em ordem fixa: é o que permite o provedor reaproveitar
     # o prefixo entre sessões.
     selection.items = sorted(
-        chosen.values(), key=lambda s: (not s.stable, s.page.path)
+        chosen.values(),
+        key=lambda s: (s.reason != "handoff assumido", not s.stable, s.page.path),
     )
     return selection
 

@@ -17,7 +17,7 @@ Diferente de um agente que quer substituir os outros, o LEA deixa cada agente
 continuar sendo ele mesmo e fica **entre** eles, como camada de memória e
 supervisão. Ver [docs/estudo-hermes.md](docs/estudo-hermes.md).
 
-## Estado: Fases 1 a 3 concluídas
+## Estado: Fases 1 a 4 concluídas
 
 O núcleo é um **daemon headless** com API local, WebSocket de eventos e receptor
 de hooks. A interface é um cliente dele — é o que permite rodar sem janela num
@@ -28,7 +28,7 @@ homelab e trocar a camada visual sem mexer no produto.
 | ✅ Fase 1 | núcleo: config, banco com migrações, barramento de eventos, CLI, tokens locais, scanner de injeção |
 | ✅ Fase 2 | memória: wiki git, busca FTS, decaimento, grafo, injeção de contexto, servidor MCP |
 | ✅ Fase 3 | projetos, launcher, adaptadores de harness, hooks, PTY, worktrees |
-| ⬜ Fase 4 | handoffs |
+| ✅ Fase 4 | handoffs: geração no Stop, claim, injeção no contexto |
 | ⬜ Fase 5 | lea-agent, skills, cron |
 | ⬜ Fase 6 | canais de mensagem |
 | ⬜ Fase 7 | custos, empacotamento |
@@ -43,7 +43,7 @@ Requer Python 3.12+ e [uv](https://docs.astral.sh/uv/).
 uv sync --extra dev
 uv run lea doctor      # confere instalação, permissões e banco
 uv run lea daemon      # sobe o núcleo em 127.0.0.1:7420
-uv run pytest          # 156 testes
+uv run pytest          # 179 testes
 ```
 
 `lea doctor` numa instalação limpa cria `~/.lea/` (config, banco, wiki, skills,
@@ -90,6 +90,40 @@ O Codex exige **confiar** em cada hook novo antes de executá-lo (há um
 `trusted_hash` por hook em `config.toml`). O LEA não forja esse hash nem sugere
 `--dangerously-bypass-hook-trust`: ele instala e avisa que o Codex vai perguntar
 na próxima execução.
+
+## Handoffs
+
+É o diferencial do LEA: o que uma sessão deixou pela metade vira um documento
+que **outro agente assume**.
+
+Quando uma sessão encerra (hook `Stop`, ou `/handoff` no console), o LEA
+resume o que aconteceu em **onde parou · o que falhou · em aberto · páginas
+citadas**. O resultado vai para duas pontas: uma linha em `handoffs`, para
+listar e filtrar, e um `wiki/handoffs/<id>.md` versionado em git — que conta
+como página de memória e pode ser citado com `[[handoffs/hf-0x...]]`.
+
+`POST /api/handoffs/{id}/claim` inicia uma sessão nova em modo `handoff`, e o
+documento entra como a **primeira página do contexto** — antes até das
+preferências globais. Uma sessão que existe para continuar um trabalho não
+pode ficar sem ele por falta de orçamento de tokens. O claim é condicionado ao
+estado `pending`, então duas interfaces clicando ao mesmo tempo não dão o
+mesmo trabalho a dois agentes.
+
+**Funciona sem LLM.** Com modelo configurado, um resumo é gerado por ele. Sem
+credencial — ou no dia em que o provedor está fora — o handoff é montado a
+partir dos eventos que o LEA já registrou: a tarefa, as ferramentas usadas,
+como terminou, as páginas consultadas. Mais seco, mas existe. Perder a
+passagem de bastão justamente quando a sessão quebrou seria o pior momento
+possível.
+
+## Modelo
+
+`agent.default_model` no config (`anthropic/claude-sonnet-5` por padrão).
+Credencial vem de `ANTHROPIC_API_KEY` no ambiente.
+
+O LEA **não** usa a credencial do Claude Code nem de outra ferramenta
+instalada: aquela conta é daquele programa, e tomá-la emprestada seria gastar
+em chamadas que você não pediu.
 
 ## Sessões
 

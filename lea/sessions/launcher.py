@@ -19,10 +19,11 @@ from typing import Any
 
 import aiosqlite
 
-from lea import harnesses, paths
+from lea import handoffs, harnesses, paths
 from lea.events import EventBus
 from lea.memory import Memory
 from lea.memory.inject import render as render_context
+from lea.memory.wiki import HANDOFF_DIR
 from lea.sessions import pty, worktree
 
 logger = logging.getLogger(__name__)
@@ -121,6 +122,7 @@ class Launcher:
         branch: str | None = None,
         use_worktree: bool = False,
         budget_tokens: int | None = None,
+        handoff_id: str | None = None,
     ) -> dict[str, Any]:
         """Inicia uma sessão e devolve o estado inicial dela."""
         if not pty.supported():
@@ -134,6 +136,19 @@ class Launcher:
         info = harness.detect()
         if info is None:
             raise LaunchError(f"{harness.name} não está instalado nesta máquina")
+
+        # Assumir um handoff define tarefa, projeto e modo antes de tudo:
+        # a sessão existe para continuar aquilo.
+        assumed: dict[str, Any] | None = None
+        if handoff_id:
+            assumed = await handoffs.get(self.conn, handoff_id)
+            if assumed is None:
+                raise LaunchError(f"handoff desconhecido: {handoff_id}")
+            if assumed["status"] != "pending":
+                raise LaunchError(f"handoff {handoff_id} já está {assumed['status']}")
+            mode = "handoff"
+            project_id = project_id or assumed["project_id"]
+            task = task or assumed["title"]
 
         project = await self._project(project_id)
         session_id = new_session_id()
@@ -172,12 +187,16 @@ class Launcher:
         for note in state.notes:
             steps.append(_step("aviso", note, ok=False))
 
-        # 4. memória injetada
+        # 4. memória injetada -- com o handoff assumido na frente de tudo
+        pinned = [f"{HANDOFF_DIR}/{handoff_id}"] if assumed else None
         selection = await self.memory.context_for(
             project_id=project_id,
             task=task,
             budget_tokens=budget_tokens or 8000,
+            pinned=pinned,
         )
+        if assumed:
+            steps.append(_step("handoff", f"{handoff_id} · {assumed['title']}"))
         steps.append(
             _step(
                 "memória",
@@ -243,6 +262,15 @@ class Launcher:
             (spawned.pid, session_id),
         )
         await self.conn.commit()
+
+        if assumed:
+            # Depois do processo de pé: um claim marcado numa sessão que
+            # falhou ao subir prenderia o handoff sem ninguém trabalhando nele.
+            try:
+                await handoffs.claim(self.conn, handoff_id, session_id)
+            except ValueError as exc:
+                steps.append(_step("handoff", str(exc), ok=False))
+
         steps.append(_step("sessão", f"ativa · pid {spawned.pid}"))
 
         await self._event(
@@ -266,6 +294,8 @@ class Launcher:
             "cwd": cwd,
             "boot": steps,
             "memory": selection.as_dict(),
+            "handoff_id": handoff_id if assumed else None,
+            "mode": mode,
         }
 
     # ── fluxo do terminal ────────────────────────────────────────────────
