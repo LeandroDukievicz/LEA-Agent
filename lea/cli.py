@@ -1,0 +1,223 @@
+"""CLI do LEA.
+
+``lea daemon``  sobe o núcleo (com ou sem janela)
+``lea hook``    ponte chamada de dentro dos agentes de código
+``lea doctor``  diagnostica a instalação
+``lea mcp``     servidor MCP de memória (Fase 2)
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import sys
+from typing import Annotated
+
+import typer
+from rich.console import Console
+from rich.table import Table
+
+from lea import __version__, paths, status
+from lea.config import load
+from lea.db import schema
+from lea.db import session as db
+from lea.security import tokens
+
+app = typer.Typer(
+    name="lea",
+    help="Centro de comando self-hosted para agentes de IA com memória persistente.",
+    no_args_is_help=True,
+    add_completion=False,
+)
+console = Console()
+err_console = Console(stderr=True)
+
+
+@app.callback()
+def _root(
+    verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Log detalhado.")] = False,
+) -> None:
+    logging.basicConfig(
+        level=logging.DEBUG if verbose else logging.INFO,
+        format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
+        datefmt="%H:%M:%S",
+    )
+
+
+@app.command()
+def version() -> None:
+    """Mostra a versão."""
+    console.print(f"lea {__version__}")
+
+
+@app.command()
+def daemon(
+    host: Annotated[str | None, typer.Option(help="Sobrepõe server.host.")] = None,
+    port: Annotated[int | None, typer.Option(help="Sobrepõe server.port.")] = None,
+) -> None:
+    """Sobe o daemon (API local, WebSocket e receptor de hooks), sem janela."""
+    import uvicorn
+
+    paths.ensure_layout()
+    config = load()
+    bind_host = host or config.server.host
+    bind_port = port or config.server.port
+
+    if bind_host not in ("127.0.0.1", "::1", "localhost"):
+        err_console.print(
+            f"[yellow]aviso:[/] escutando em {bind_host}, alcançável de fora desta "
+            "máquina. As ferramentas do agente executam comandos aqui."
+        )
+
+    console.print(f"[cyan]lea[/] {__version__} · http://{bind_host}:{bind_port}")
+    uvicorn.run(
+        "lea.server.app:app",
+        host=bind_host,
+        port=bind_port,
+        log_level="warning",
+        access_log=False,
+    )
+
+
+@app.command()
+def hook(
+    event: Annotated[str, typer.Argument(help="SessionStart, PostToolUse, PreCompact ou Stop.")],
+) -> None:
+    """Repassa um evento de ciclo de vida ao daemon. Chamado pelos harnesses.
+
+    O JSON do evento vem pelo stdin, que é como Claude Code e Codex entregam
+    payload de hook. A saída no stdout volta para o agente, então nada é
+    impresso aqui além da resposta do daemon.
+
+    Falhar aqui não pode derrubar a sessão do usuário: se o daemon estiver
+    fora do ar, saímos em silêncio com código 0. Um hook que quebra o agente
+    de código é pior que um evento perdido.
+    """
+    import httpx
+
+    if event not in {"SessionStart", "PostToolUse", "PreCompact", "Stop"}:
+        err_console.print(f"[red]evento desconhecido:[/] {event}")
+        raise typer.Exit(2)
+
+    raw = sys.stdin.read() if not sys.stdin.isatty() else ""
+    try:
+        payload = json.loads(raw) if raw.strip() else {}
+    except json.JSONDecodeError:
+        payload = {"raw": raw}
+
+    config = load()
+    url = f"http://{config.server.host}:{config.server.port}/hooks/{event}"
+    try:
+        response = httpx.post(
+            url,
+            json=payload,
+            headers={"X-Lea-Hook-Token": tokens.hook_token()},
+            timeout=5.0,
+        )
+        response.raise_for_status()
+    except Exception as exc:
+        logging.getLogger(__name__).debug("hook %s não entregue: %s", event, exc)
+        raise typer.Exit(0) from None
+
+    console.print_json(data=response.json())
+
+
+@app.command()
+def mcp() -> None:
+    """Servidor MCP ``lea.memory`` por stdio. Chega na Fase 2."""
+    err_console.print("[yellow]ainda não implementado[/] — previsto para a Fase 2 (Memória).")
+    raise typer.Exit(1)
+
+
+@app.command()
+def doctor() -> None:
+    """Confere instalação, permissões e banco."""
+    asyncio.run(_doctor())
+
+
+async def _doctor() -> None:
+    root = paths.ensure_layout()
+    config = load()
+
+    table = Table(show_header=True, header_style="bold cyan", box=None, pad_edge=False)
+    table.add_column("verificação")
+    table.add_column("estado")
+    table.add_column("detalhe", overflow="fold")
+
+    ok, warn, bad = "[green]ok[/]", "[yellow]atenção[/]", "[red]falha[/]"
+    problems = 0
+
+    table.add_row("versão", ok, f"lea {__version__} · python {sys.version.split()[0]}")
+    table.add_row("diretório", ok, str(root))
+    table.add_row("config", ok, str(paths.config_file()))
+
+    # Segredos precisam estar em 0600: eles autorizam quem fala com o daemon.
+    # Chamar o getter cria o token se ainda não existir, então o doctor também
+    # serve para inicializar uma instalação nova.
+    for label, path, ensure in (
+        ("token da ui", paths.ui_token_file(), tokens.ui_token),
+        ("token de hook", paths.hook_token_file(), tokens.hook_token),
+    ):
+        ensure()
+        if paths.is_secret_tight(path):
+            table.add_row(label, ok, "0600")
+        else:
+            problems += 1
+            table.add_row(label, bad, f"permissão frouxa em {path}")
+
+    if config.server.is_exposed:
+        problems += 1
+        table.add_row(
+            "rede", warn, f"escutando em {config.server.host}, alcançável de fora da máquina"
+        )
+    else:
+        table.add_row("rede", ok, f"{config.server.host}:{config.server.port}")
+
+    try:
+        async with db.connection() as conn:
+            version = await db.current_version(conn)
+            table.add_row(
+                "banco",
+                ok if version == schema.LATEST_VERSION else warn,
+                f"esquema v{version} de v{schema.LATEST_VERSION} · {paths.database_file()}",
+            )
+            issues = await db.integrity_problems(conn)
+            if issues:
+                problems += 1
+                table.add_row("integridade", bad, "; ".join(issues[:3]))
+            else:
+                table.add_row("integridade", ok, "sem problemas")
+            counters = await status.counters(conn)
+            table.add_row(
+                "conteúdo",
+                ok,
+                f"{counters['projects']} projetos · {counters['pages']} páginas · "
+                f"{counters['sessions_active']} sessões ativas",
+            )
+    except Exception as exc:
+        problems += 1
+        table.add_row("banco", bad, str(exc))
+
+    status.prime()
+    stats = status.system_stats()
+    table.add_row(
+        "máquina",
+        ok,
+        f"mem {stats.memory_used_gb:.1f}/{stats.memory_total_gb:.1f} GB "
+        f"({stats.memory_percent:.0f}%)",
+    )
+
+    console.print(table)
+    if problems:
+        err_console.print(f"\n[red]{problems} problema(s).[/]")
+        raise typer.Exit(1)
+    console.print("\n[green]tudo certo.[/]")
+
+
+def main() -> None:
+    app()
+
+
+if __name__ == "__main__":
+    main()

@@ -13,55 +13,95 @@ O que ele une:
    tarefas agendadas escritas em linguagem natural, delega para subagentes e
    conversa por Telegram, Discord, Slack e WhatsApp.
 
-## Estado atual
+Diferente de um agente que quer substituir os outros, o LEA deixa cada agente
+continuar sendo ele mesmo e fica **entre** eles, como camada de memória e
+supervisão. Ver [docs/estudo-hermes.md](docs/estudo-hermes.md).
 
-Só o **protótipo visual**, que serve de fonte da verdade de layout e estética
-para a implementação. Ainda não há backend: todos os números, sessões, custos
-e logs são dados fictícios escritos no próprio arquivo.
+## Estado: Fase 1 (núcleo) concluída
+
+O núcleo é um **daemon headless** com API local, WebSocket de eventos e receptor
+de hooks. A interface é um cliente dele — é o que permite rodar sem janela num
+homelab e trocar a camada visual sem mexer no produto.
+
+| | |
+|---|---|
+| ✅ Fase 1 | núcleo: config, banco com migrações, barramento de eventos, CLI, tokens locais, scanner de injeção |
+| ⬜ Fase 2 | memória: wiki git, FTS, decaimento, grafo, servidor MCP |
+| ⬜ Fase 3 | projetos, launcher, harnesses, PTY, worktrees |
+| ⬜ Fase 4 | handoffs |
+| ⬜ Fase 5 | lea-agent, skills, cron |
+| ⬜ Fase 6 | canais de mensagem |
+| ⬜ Fase 7 | custos, empacotamento |
+
+A camada de interface ainda não foi escolhida — ver [Protótipo](#protótipo).
+
+## Rodar
+
+Requer Python 3.12+ e [uv](https://docs.astral.sh/uv/).
+
+```bash
+uv sync --extra dev
+uv run lea doctor      # confere instalação, permissões e banco
+uv run lea daemon      # sobe o núcleo em 127.0.0.1:7420
+uv run pytest          # 48 testes
+```
+
+`lea doctor` numa instalação limpa cria `~/.lea/` (config, banco, wiki, skills,
+worktrees, logs), com os diretórios em `0700` e os tokens em `0600`.
+
+### Comandos
+
+```
+lea daemon    sobe o núcleo, sem janela (serve para homelab)
+lea hook      ponte chamada de dentro dos agentes de código
+lea doctor    diagnostica a instalação
+lea mcp       servidor MCP de memória (Fase 2)
+```
+
+### Configuração
+
+`~/.lea/config.toml`, criado com padrões no primeiro uso e feito para ser
+editado à mão. Precedência: `LEA_*` no ambiente > arquivo > padrão do código.
+Aninhado usa duplo sublinhado (`LEA_SERVER__PORT=7421`).
+
+`LEA_HOME` aponta a raiz para outro lugar — útil para perfis separados e usado
+pelos testes.
+
+## Segurança
+
+- O daemon escuta **só em 127.0.0.1**. Mudar `server.host` o expõe à rede, e com
+  ele vão as ferramentas do agente, que executam comandos; a CLI e o `doctor`
+  avisam.
+- Escutar em loopback não autentica nada — qualquer processo da máquina alcança a
+  porta. Há **dois tokens** locais em `0600`: um para a interface, outro para os
+  hooks, que rodam dentro de processos de terceiros e precisam poder ser
+  rotacionados em separado.
+- **Memória é superfície de ataque.** O agente A escreve na wiki e o agente B lê
+  aquilo dentro do contexto dele: se A processou uma issue ou página web hostil,
+  o texto do atacante atravessa a wiki e chega ao system prompt de B — e o git
+  faz isso persistir. `lea/security/injection.py` varre conteúdo que entra e sai
+  da memória, com os limites documentados no módulo.
+- Dependências com **pin exato**, para que nenhuma versão nova chegue sem revisão.
+
+## Protótipo
+
+A fonte da verdade visual, ainda sem backend — números, sessões e custos são
+dados fictícios escritos no próprio arquivo.
 
 ```
 wireframe.html     protótipo, página única autocontida
 app/               o mesmo protótipo desempacotado em arquivos
-├─ index.html      documento (template dc-runtime)
-└─ assets/
-   ├─ dc-runtime.js        runtime declarativo que monta a UI
-   ├─ vendor/              react 18.3.1 + react-dom (UMD)
-   └─ fonts/               JetBrains Mono e Rajdhani (woff2, offline)
 ```
 
-`wireframe.html` embute tudo em base64 num único arquivo; `app/` é a mesma
-página com os assets em disco. Os dois renderizam igual — a extração é byte a
-byte nos assets e não reescreve o HTML, só troca as referências internas por
-caminhos de arquivo.
-
-## Ver o protótipo
-
-Os assets carregam por caminho relativo, então sirva o diretório:
+Para ver, sirva o diretório (os assets carregam por caminho relativo):
 
 ```bash
 python3 -m http.server 8731
 # http://127.0.0.1:8731/app/index.html
 ```
 
-O bundle de arquivo único abre direto no navegador:
-
-```bash
-xdg-open wireframe.html
-```
-
-Isso é só para inspecionar o protótipo. O produto final abre numa **janela
-nativa**, sem navegador e sem porta exposta.
-
-## Telas
-
-- **Overview** — agentes online, custo do dia, handoffs pendentes, tokens/hora
-- **Projetos** — sessões rodando, fixadas, aguardando resposta e recentes
-- **Console** — stream da sessão, tool calls colapsáveis, slash commands
-- **Memória** — wiki em Markdown, força/decaimento, versões git e grafo
-- **Skills** — biblioteca versionada, taxa de sucesso e auto-melhoria
-- **Histórico & Handoffs** — linha do tempo e transferência entre agentes
-- **Automações** — tarefas em cron escritas em linguagem natural
-- **Canais & Agentes** — matriz de harnesses × hooks e gateways de mensagem
+Telas: Overview, Projetos, Console, Memória, Skills, Histórico & Handoffs,
+Automações, Canais & Agentes.
 
 Interface em português do Brasil; código, tabelas e APIs em inglês.
 

@@ -1,0 +1,60 @@
+[project]
+name = "lea-agent"
+version = "0.1.0"
+description = "Centro de comando self-hosted para agentes de IA com memória persistente"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12,<3.15"
+authors = [{ name = "Leandro Dukievicz" }]
+
+# Toda dependência direta é fixada em ==X.Y.Z, sem ranges.
+#
+# Motivo: um range deixa o PyPI entregar uma versão nova de uma transitiva a
+# qualquer momento, sem revisão nossa. O Hermes Agent aprendeu isso na pele com
+# o worm Mini Shai-Hulud, que atingiu o `mistralai` 2.4.6 no PyPI -- quem tinha
+# range instalou o pacote comprometido nas horas antes da quarentena.
+#
+# Regra de escopo: só entra aqui o que TODA execução do LEA usa. Coisa de
+# provedor ou de canal específico vai em [project.optional-dependencies] e é
+# instalada quando o usuário escolhe aquele backend. Menos dependência no
+# núcleo = menor raio de explosão no próximo ataque de cadeia de suprimentos.
+#
+# Depois de mexer num pin, rode `uv lock` para a resolução transitiva
+# acompanhar.
+dependencies = [
+  "typer==0.20.0",
+  "pydantic==2.12.4",
+  "pydantic-settings==2.12.0",
+  "fastapi==0.122.0",
+  "uvicorn[standard]==0.41.0",
+  "aiosqlite==0.21.0",
+  "psutil==7.1.3",
+  "rich==14.3.4",
+  "tomli-w==1.2.0",
+  "httpx==0.28.1",
+]
+
+[project.scripts]
+lea = "lea.cli:main"
+
+[project.optional-dependencies]
+dev = [
+  "pytest==9.0.1",
+  "pytest-asyncio==1.3.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["lea"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
