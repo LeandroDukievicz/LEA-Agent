@@ -219,6 +219,7 @@ class CronScheduler:
                 task=job["instruction_nl"],
                 skill_id=int(job["skill_id"]) if job["skill_id"] is not None else None,
                 source=f"cron:{job_id}",
+                backend=job["agent_backend"],
             )
             session_id = session["id"]
             result = await task

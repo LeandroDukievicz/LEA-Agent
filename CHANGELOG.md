@@ -7,8 +7,18 @@ Enquanto o LEA não tem release, cada entrada é uma fase da especificação.
 
 ### Fase 5 — base do agente, skills e cron (em andamento)
 
-- Agente próprio via Anthropic, com sessão, eventos, memória e limites de
-  duração, tokens, rodadas de ferramentas e concorrência.
+- Agente próprio com backends Codex CLI, Claude Code e Anthropic API; sessão,
+  eventos e contexto da wiki/skills são compartilhados entre os modos.
+- Codex usa `codex exec --json`, sandbox `workspace-write` e revisão automática;
+  Claude Code usa `claude -p`, modo de permissão `auto` e prompts de permissão
+  negados em execução sem terminal.
+- Autenticação dos backends CLI fica no próprio programa; chaves de API de
+  modelos não são repassadas aos processos locais.
+- `lea run --backend` escolhe o backend por tarefa. Automações persistem a
+  escolha e as que já existiam são migradas para Codex.
+- O agente via API mantém limites de duração, tokens, rodadas de ferramenta e
+  concorrência. Para os CLIs, o LEA aplica limite de duração; controle de
+  tokens e custo monetário ainda não está integrado.
 - Ferramentas para listar, ler e escrever arquivos do projeto e executar
   programas sem shell; caminhos de arquivo ficam dentro do projeto e comandos
   configurados para aprovação encerram a tarefa sem execução.

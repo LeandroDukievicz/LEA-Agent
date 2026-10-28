@@ -170,18 +170,28 @@ def reindex() -> None:
 def run_agent(
     project_id: Annotated[int, typer.Option("--project", help="Id do projeto com autonomia habilitada.")],
     task: Annotated[str, typer.Option("--task", help="Tarefa para o lea-agent.")],
+    backend: Annotated[
+        str | None,
+        typer.Option("--backend", help="Backend: codex, claude-code ou anthropic-api.", metavar="BACKEND"),
+    ] = None,
     skill: Annotated[str | None, typer.Option("--skill", help="Skill pelo nome.")] = None,
 ) -> None:
-    """Executa uma tarefa com o agente próprio do LEA."""
-    result = asyncio.run(_run_agent(project_id, task, skill))
-    console.print(f"[cyan]{result['session_id']}[/] · {result['status']}")
+    """Executa uma tarefa via Codex CLI, Claude Code ou Anthropic API."""
+    result = asyncio.run(_run_agent(project_id, task, skill, backend))
+    console.print(f"[cyan]{result['session_id']}[/] · {result['backend']} · {result['status']}")
     console.print(result["summary"])
-    console.print(f"tokens: {result['tokens_in']} entrada · {result['tokens_out']} saída")
+    if result["tokens_in"] or result["tokens_out"]:
+        console.print(f"tokens: {result['tokens_in']} entrada · {result['tokens_out']} saída")
     if result["status"] != "ended":
         raise typer.Exit(1)
 
 
-async def _run_agent(project_id: int, task: str, skill_name: str | None) -> dict[str, Any]:
+async def _run_agent(
+    project_id: int,
+    task: str,
+    skill_name: str | None,
+    backend: str | None = None,
+) -> dict[str, Any]:
     from lea.agent import AgentService
     from lea.events import EventBus
     from lea.memory import Memory
@@ -206,7 +216,12 @@ async def _run_agent(project_id: int, task: str, skill_name: str | None) -> dict
             skill_id = int(row["id"])
         agent = AgentService(conn, memory, config, EventBus())
         try:
-            session, running = await agent.start(project_id=project_id, task=task, skill_id=skill_id)
+            session, running = await agent.start(
+                project_id=project_id,
+                task=task,
+                skill_id=skill_id,
+                backend=backend,
+            )
             console.print(f"sessão [cyan]{session['id']}[/] iniciada")
             return await running
         except Exception as exc:

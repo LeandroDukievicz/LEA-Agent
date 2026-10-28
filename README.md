@@ -29,7 +29,7 @@ homelab e trocar a camada visual sem mexer no produto.
 | ✅ Fase 2 | memória: wiki git, busca FTS, decaimento, grafo, injeção de contexto, servidor MCP |
 | ✅ Fase 3 | projetos, launcher, adaptadores de harness, hooks, PTY, worktrees |
 | ✅ Fase 4 | handoffs: geração no Stop, claim, injeção no contexto |
-| 🟡 Fase 5 | lea-agent, skills, cron — execução e agendamento básicos implementados |
+| 🟡 Fase 5 | lea-agent, skills, cron — backends Codex CLI, Claude Code e Anthropic API |
 | ⬜ Fase 6 | canais de mensagem |
 | ⬜ Fase 7 | custos, empacotamento |
 
@@ -64,7 +64,7 @@ lea hook      ponte chamada de dentro dos agentes de código
 lea mcp        servidor MCP lea.memory, por stdio
 lea harnesses  matriz de integração dos agentes; --install para configurar
 lea reindex    reconstrói o índice da memória a partir do git
-lea run        executa uma tarefa com o agente próprio do LEA
+lea run        executa uma tarefa via Codex CLI, Claude Code ou Anthropic API
 lea doctor     diagnostica a instalação
 ```
 
@@ -124,35 +124,49 @@ como terminou, as páginas consultadas. Mais seco, mas existe. Perder a
 passagem de bastão justamente quando a sessão quebrou seria o pior momento
 possível.
 
-## Modelo
+## Backend e autenticação
 
-`agent.default_model` no config (`anthropic/claude-sonnet-5` por padrão).
-Credencial vem de `ANTHROPIC_API_KEY` no ambiente.
+O backend padrão é o Codex CLI. Você pode mudá-lo em `~/.lea/config.toml`:
 
-O LEA **não** usa a credencial do Claude Code nem de outra ferramenta
-instalada: aquela conta é daquele programa, e tomá-la emprestada seria gastar
-em chamadas que você não pediu.
+```toml
+[agent]
+default_backend = "codex" # codex | claude-code | anthropic-api
+```
+
+`codex` e `claude-code` iniciam os CLIs locais `codex exec` e `claude -p` e
+usam a autenticação já configurada em cada ferramenta. Entre primeiro pelo
+próprio `codex` ou `claude auth login`. As chaves `OPENAI_API_KEY`,
+`CODEX_API_KEY` e `ANTHROPIC_API_KEY` não são repassadas aos processos CLI.
+Isso dispensa uma chave de API configurada no LEA; o modelo ainda usa a conta,
+conexão e limites do serviço autenticado pelo CLI. As sessões também seguem a
+política de histórico nativa de cada CLI. O modo `anthropic-api` continua
+disponível e usa `ANTHROPIC_API_KEY` junto com `agent.default_model`.
 
 ## Agente autônomo
 
-O `lea-agent` usa a chave Anthropic configurada no ambiente. O projeto precisa
-ter `allow_autonomous` habilitado; projetos novos começam com autonomia
-desligada. A configuração pode ser alterada pela API em
+O projeto precisa ter `allow_autonomous` habilitado; projetos novos começam
+com autonomia desligada. A configuração pode ser alterada pela API em
 `PATCH /api/projects/{id}/autonomy`.
 
 ```bash
-uv run lea run --project 1 --task "revise o README e corrija links quebrados"
-uv run lea run --project 1 --task "prepare uma release" --skill release-checklist
+uv run lea run --project 1 --backend codex --task "revise o README e corrija links quebrados"
+uv run lea run --project 1 --backend claude-code --task "prepare uma release" --skill release-checklist
+uv run lea run --project 1 --backend anthropic-api --task "resuma o projeto"
 ```
 
-O agente recebe contexto da wiki e, opcionalmente, uma skill. Suas ferramentas
-listam, leem e escrevem arquivos no projeto e executam programas com argumentos
-separados, sem shell. Caminhos de arquivo ficam dentro do projeto. Comandos que
-casam com `agent.require_approval_for` ou com a lista do projeto são bloqueados
-e encerram a tarefa para revisão manual. Comandos permitidos rodam como o
-usuário local, então habilite autonomia apenas em projetos que você confia.
-Cada tarefa tem limites de tempo,
-tokens, rodadas de ferramenta e concorrência em `config.toml`.
+Todos os backends recebem contexto da wiki e, opcionalmente, uma skill. O modo
+`anthropic-api` usa as ferramentas do LEA, limita caminhos ao projeto e bloqueia
+comandos configurados para revisão. O Codex roda com sandbox `workspace-write`
+e revisão automática de permissões; o Claude Code roda em modo `auto`, e uma
+permissão que exigiria interação é negada. Os CLIs usam seus próprios controles
+locais; `require_approval_for` também é incluído nas instruções e não substitui
+esses controles. O LEA impõe limite de duração aos três backends. Limites de
+tokens do agente e métricas de custo continuam disponíveis apenas no modo API e
+em fases posteriores; para o consumo dos CLIs, consulte o próprio Codex ou
+Claude Code. Habilite autonomia somente em projetos nos quais você confia.
+
+Uma automação cron guarda seu `backend`. Se omitido, usa `agent.default_backend`;
+automações existentes passam a usar Codex após a migração.
 
 Skills ficam em `~/.lea/skills/<nome>/SKILL.md`, no formato Agent Skills. O
 daemon indexa skills no início e recolhe edições feitas em disco; versões,

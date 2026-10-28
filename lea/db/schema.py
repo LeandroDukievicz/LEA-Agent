@@ -267,7 +267,12 @@ _INITIAL: tuple[str, ...] = (
 
 
 #: Migrações em ordem. O índice+1 é a versão gravada em ``PRAGMA user_version``.
-MIGRATIONS: tuple[tuple[str, ...], ...] = (_INITIAL,)
+_CLI_AGENT_BACKENDS: tuple[str, ...] = (
+    "ALTER TABLE cron_jobs ADD COLUMN agent_backend TEXT NOT NULL DEFAULT 'codex' "
+    "CHECK (agent_backend IN ('codex', 'claude-code', 'anthropic-api'))",
+)
+
+MIGRATIONS: tuple[tuple[str, ...], ...] = (_INITIAL, _CLI_AGENT_BACKENDS)
 
 #: Versão alvo do esquema.
 LATEST_VERSION = len(MIGRATIONS)

@@ -8,7 +8,7 @@ feito para ser editado à mão.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import tomli_w
 from pydantic import BaseModel, Field, field_validator
@@ -70,6 +70,7 @@ class MemoryConfig(BaseModel):
 
 class AgentConfig(BaseModel):
     default_model: str = "anthropic/claude-sonnet-5"
+    default_backend: Literal["codex", "claude-code", "anthropic-api"] = "codex"
     auto_apply_skill_updates: bool = False
     max_duration_min: int = Field(default=30, ge=1, le=1440)
     max_parallel_tasks: int = Field(default=2, ge=1, le=16)

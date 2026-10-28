@@ -9,7 +9,7 @@ import aiosqlite
 from fastapi import APIRouter, Body, HTTPException, Query, Request
 
 from lea import cron, skills
-from lea.agent import AgentError, AgentService
+from lea.agent import AgentError, AgentService, normalize_backend
 
 router = APIRouter(prefix="/api", tags=["agent"])
 MAX_INSTRUCTION_CHARS = 20_000
@@ -28,11 +28,15 @@ def _db(request: Request) -> aiosqlite.Connection:
 
 @router.post("/agent/runs", status_code=202)
 async def start_agent_run(request: Request, payload: Annotated[dict[str, Any], Body()]) -> dict[str, Any]:
+    backend = payload.get("backend")
+    if backend is not None and not isinstance(backend, str):
+        raise HTTPException(status_code=422, detail="backend precisa ser texto")
     try:
         session, _task = await _agent(request).start(
             project_id=int(payload.get("project_id")),
             task=str(payload.get("task") or ""),
             skill_id=int(payload["skill_id"]) if payload.get("skill_id") is not None else None,
+            backend=backend,
         )
     except (AgentError, TypeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -156,6 +160,7 @@ async def list_automations(
     result = []
     for row in jobs:
         item = dict(row)
+        item["backend"] = item.pop("agent_backend")
         item["project_id"] = int(row["project_id"]) if row["project_id"] is not None else None
         item["skill_id"] = int(row["skill_id"]) if row["skill_id"] is not None else None
         result.append(item)
@@ -168,15 +173,19 @@ async def create_automation(request: Request, payload: Annotated[dict[str, Any],
     instruction = str(payload.get("instruction_nl") or "").strip()
     expression = str(payload.get("cron_expr") or "").strip()
     timezone_name = str(payload.get("timezone") or "America/Sao_Paulo")
+    backend_value = payload.get("backend", request.app.state.config.agent.default_backend)
     project_id = payload.get("project_id")
     if not instruction or not expression or project_id is None:
         raise HTTPException(status_code=422, detail="instruction_nl, cron_expr e project_id são obrigatórios")
     if len(instruction) > MAX_INSTRUCTION_CHARS:
         raise HTTPException(status_code=422, detail=f"instruction_nl excede {MAX_INSTRUCTION_CHARS} caracteres")
+    if not isinstance(backend_value, str):
+        raise HTTPException(status_code=422, detail="backend precisa ser texto")
     try:
+        backend = normalize_backend(backend_value)
         project_id = int(project_id)
         next_at = cron.validate(expression, timezone_name)
-    except (TypeError, ValueError, cron.CronError) as exc:
+    except (AgentError, TypeError, ValueError, cron.CronError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     async with conn.execute("SELECT allow_autonomous FROM projects WHERE id = ?", (project_id,)) as cursor:
         project = await cursor.fetchone()
@@ -197,9 +206,9 @@ async def create_automation(request: Request, payload: Annotated[dict[str, Any],
 
     now = _now()
     cursor = await conn.execute(
-        "INSERT INTO cron_jobs (instruction_nl, cron_expr, timezone, project_id, skill_id, status, next_run_at, created_at) "
-        "VALUES (?, ?, ?, ?, ?, 'active', ?, ?)",
-        (instruction, expression, timezone_name, project_id, skill_id, next_at, now),
+        "INSERT INTO cron_jobs (instruction_nl, cron_expr, timezone, project_id, skill_id, agent_backend, status, next_run_at, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)",
+        (instruction, expression, timezone_name, project_id, skill_id, backend, next_at, now),
     )
     await conn.commit()
     return await _automation(conn, int(cursor.lastrowid or 0))
@@ -224,6 +233,7 @@ async def update_automation(request: Request, job_id: int, payload: Annotated[di
     instruction = str(payload.get("instruction_nl", current["instruction_nl"])).strip()
     expression = str(payload.get("cron_expr", current["cron_expr"])).strip()
     timezone_name = str(payload.get("timezone", current["timezone"]))
+    backend_value = payload.get("backend", current["agent_backend"])
     status = str(payload.get("status", current["status"]))
     if status not in {"active", "paused"}:
         raise HTTPException(status_code=422, detail="status precisa ser active ou paused")
@@ -231,10 +241,13 @@ async def update_automation(request: Request, job_id: int, payload: Annotated[di
         raise HTTPException(status_code=422, detail="instruction_nl não pode ficar vazio")
     if len(instruction) > MAX_INSTRUCTION_CHARS:
         raise HTTPException(status_code=422, detail=f"instruction_nl excede {MAX_INSTRUCTION_CHARS} caracteres")
+    if not isinstance(backend_value, str):
+        raise HTTPException(status_code=422, detail="backend precisa ser texto")
     try:
+        backend = normalize_backend(backend_value)
         proposed_next = cron.validate(expression, timezone_name)
         next_at = proposed_next if status == "active" else current["next_run_at"]
-    except cron.CronError as exc:
+    except (AgentError, cron.CronError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     skill_id = payload.get("skill_id", current["skill_id"])
@@ -253,8 +266,8 @@ async def update_automation(request: Request, job_id: int, payload: Annotated[di
             raise HTTPException(status_code=422, detail="projeto sem autonomia habilitada")
 
     await conn.execute(
-        "UPDATE cron_jobs SET instruction_nl = ?, cron_expr = ?, timezone = ?, skill_id = ?, status = ?, next_run_at = ? WHERE id = ?",
-        (instruction, expression, timezone_name, skill_id, status, next_at, job_id),
+        "UPDATE cron_jobs SET instruction_nl = ?, cron_expr = ?, timezone = ?, skill_id = ?, agent_backend = ?, status = ?, next_run_at = ? WHERE id = ?",
+        (instruction, expression, timezone_name, skill_id, backend, status, next_at, job_id),
     )
     await conn.commit()
     return await _automation(conn, job_id)
@@ -296,7 +309,9 @@ async def _automation(conn: aiosqlite.Connection, job_id: int) -> dict[str, Any]
         row = await cursor.fetchone()
     if row is None:
         raise KeyError(job_id)
-    return dict(row)
+    item = dict(row)
+    item["backend"] = item.pop("agent_backend")
+    return item
 
 
 def _now() -> str:

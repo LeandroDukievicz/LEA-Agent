@@ -127,18 +127,31 @@ GET   /api/automations/{id}/runs         histórico de execução
 PATCH /api/projects/{id}/autonomy        opt-in e limites do projeto
 ```
 
-`lea-agent` só inicia em projeto com `allow_autonomous = 1`. O agente recebe
-ferramentas de leitura e escrita restritas a caminhos dentro do projeto, além
+`lea-agent` só inicia em projeto com `allow_autonomous = 1`. O backend padrão é
+Codex CLI; cada tarefa ou automação pode escolher `codex`, `claude-code` ou
+`anthropic-api`. Os CLIs recebem o contexto da wiki e a skill selecionada e
+usam suas autenticações locais. O Codex roda em sandbox `workspace-write` com
+revisão automática de permissões. O Claude Code roda no modo `auto`, e prompts
+que exigiriam interação são negados. As regras `require_approval_for` são
+aplicadas diretamente às ferramentas do modo API e também incluídas como
+instruções nos modos CLI, cujas permissões locais continuam sendo a autoridade.
+`POST /api/agent/runs` e `POST /api/automations` aceitam `backend`; se ausente,
+valem `agent.default_backend`.
+
+O modo API recebe ferramentas de leitura e escrita limitadas ao projeto, além
 de execução de programas sem shell. Comandos que correspondem à lista global
-ou do projeto são recusados e encerram a tarefa para revisão manual. A execução
-de comandos permitidos ocorre com os privilégios locais do usuário.
+ou do projeto são recusados antes da execução. Comandos permitidos e os CLIs
+locais rodam sob o usuário local; habilite autonomia apenas para projetos em
+que confia. O LEA impõe limite de duração a todos os backends; os limites de
+tokens são aplicados pelo modo API.
 
 Skills ficam em `~/.lea/skills/<nome>/SKILL.md`; ao iniciar, o daemon importa
 novos arquivos e indexa edições. O Markdown guarda o conteúdo e o SQLite guarda
 versões e execuções. O scanner estrito impede injetar uma skill marcada. O cron aceita
 cinco campos numéricos e fuso IANA; o daemon
 calcula a próxima execução em UTC, faz claim antes de disparar e marca execuções
-inacabadas como interrompidas após reiniciar.
+inacabadas como interrompidas após reiniciar. O backend fica salvo com cada
+automação; as anteriores à migração passam a usar Codex.
 
 Esta é a base da Fase 5. Revisão automática de skills, fluxo interativo de
 aprovação, custo monetário e canais ainda não estão ligados ao agente próprio.

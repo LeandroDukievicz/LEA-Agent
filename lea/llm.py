@@ -9,8 +9,10 @@ o **SDK oficial da Anthropic**, que é o provedor padrão da configuração.
 
 O motivo é prático: saída estruturada com validação (``messages.parse``) e
 erros tipados valem mais, agora, que multi-provedor que ninguém está usando.
-Quando a Fase 5 precisar de Ollama ou OpenAI, entra outro backend atrás deste
-mesmo protocolo -- possivelmente o próprio ``litellm``.
+Os backends Codex CLI e Claude Code do agente próprio são processos locais,
+fora desta camada de chamadas por API. Se outro recurso precisar de mais um
+provedor HTTP, ele entra atrás deste mesmo protocolo -- possivelmente usando
+o próprio ``litellm``.
 
 Funcionar sem credencial é requisito, não cortesia
 --------------------------------------------------
