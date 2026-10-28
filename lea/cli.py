@@ -13,7 +13,7 @@ import json
 import logging
 import os
 import sys
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 from rich.console import Console
@@ -164,6 +164,59 @@ def reindex() -> None:
     histórico de acessos é preservado.
     """
     asyncio.run(_reindex())
+
+
+@app.command("run")
+def run_agent(
+    project_id: Annotated[int, typer.Option("--project", help="Id do projeto com autonomia habilitada.")],
+    task: Annotated[str, typer.Option("--task", help="Tarefa para o lea-agent.")],
+    skill: Annotated[str | None, typer.Option("--skill", help="Skill pelo nome.")] = None,
+) -> None:
+    """Executa uma tarefa com o agente próprio do LEA."""
+    result = asyncio.run(_run_agent(project_id, task, skill))
+    console.print(f"[cyan]{result['session_id']}[/] · {result['status']}")
+    console.print(result["summary"])
+    console.print(f"tokens: {result['tokens_in']} entrada · {result['tokens_out']} saída")
+    if result["status"] != "ended":
+        raise typer.Exit(1)
+
+
+async def _run_agent(project_id: int, task: str, skill_name: str | None) -> dict[str, Any]:
+    from lea.agent import AgentService
+    from lea.events import EventBus
+    from lea.memory import Memory
+    from lea import skills
+
+    paths.ensure_layout()
+    config = load()
+    async with db.connection() as conn:
+        memory = Memory(
+            conn,
+            config.memory.wiki_path,
+            half_lives=config.memory.half_life_days.model_dump(),
+        )
+        await memory.setup()
+        await skills.sync_from_disk(conn)
+        skill_id = None
+        if skill_name:
+            async with conn.execute("SELECT id FROM skills WHERE name = ?", (skill_name,)) as cursor:
+                row = await cursor.fetchone()
+            if row is None:
+                raise typer.BadParameter(f"skill desconhecida: {skill_name}")
+            skill_id = int(row["id"])
+        agent = AgentService(conn, memory, config, EventBus())
+        try:
+            session, running = await agent.start(project_id=project_id, task=task, skill_id=skill_id)
+            console.print(f"sessão [cyan]{session['id']}[/] iniciada")
+            return await running
+        except Exception as exc:
+            from lea.agent import AgentError
+
+            if isinstance(exc, AgentError):
+                raise typer.BadParameter(str(exc)) from exc
+            raise
+        finally:
+            await agent.shutdown()
 
 
 async def _reindex() -> None:

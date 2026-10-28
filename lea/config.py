@@ -71,6 +71,11 @@ class MemoryConfig(BaseModel):
 class AgentConfig(BaseModel):
     default_model: str = "anthropic/claude-sonnet-5"
     auto_apply_skill_updates: bool = False
+    max_duration_min: int = Field(default=30, ge=1, le=1440)
+    max_parallel_tasks: int = Field(default=2, ge=1, le=16)
+    max_tool_rounds: int = Field(default=12, ge=1, le=100)
+    max_tokens_per_task: int = Field(default=24000, ge=1000, le=1_000_000)
+    command_timeout_seconds: int = Field(default=120, ge=1, le=3600)
     require_approval_for: list[str] = Field(
         default_factory=lambda: ["git push", "rm -rf", "sudo", "curl", "wget"]
     )

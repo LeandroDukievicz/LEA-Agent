@@ -33,9 +33,12 @@ from lea.config import Config, load
 from lea.db import session as db
 from lea.memory import Memory
 from lea import handoffs
+from lea import skills
+from lea.agent import AgentService
+from lea.cron import CronScheduler
 from lea.memory.inject import render as render_context
 from lea.security import tokens
-from lea.server import handoff_routes, memory_routes, session_routes
+from lea.server import agent_routes, handoff_routes, memory_routes, session_routes
 from lea.sessions.launcher import Launcher
 
 logger = logging.getLogger(__name__)
@@ -109,7 +112,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     await memory.setup()
     app.state.memory = memory
+    skill_sync = await skills.sync_from_disk(app.state.db)
+    if skill_sync["problems"]:
+        logger.warning("%d skill(s) não puderam ser indexadas", len(skill_sync["problems"]))
     app.state.launcher = Launcher(app.state.db, memory, events.bus)
+    app.state.agent = AgentService(app.state.db, memory, config, events.bus)
+    app.state.cron = CronScheduler(app.state.db, app.state.agent, events.bus)
+    await app.state.cron.start()
 
     status.prime()
 
@@ -124,6 +133,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        await app.state.cron.shutdown()
+        await app.state.agent.shutdown()
         # Ordem importa: as sessões param (e suas tasks de PTY morrem) antes
         # de o banco fechar. Ao contrário, cada sessão viva registra um
         # "no active connection" na saída.
@@ -315,6 +326,7 @@ async def receive_hook(event_name: str, request: Request) -> dict[str, Any]:
 
 # Rotas de memória: tela Memória, launcher e manutenção do índice.
 app.include_router(memory_routes.router, dependencies=[Depends(require_ui_token)])
+app.include_router(agent_routes.router, dependencies=[Depends(require_ui_token)])
 
 # Projetos, harnesses e sessões. O WebSocket do terminal autentica por conta
 # própria (query string), então fica fora da dependência de cabeçalho.

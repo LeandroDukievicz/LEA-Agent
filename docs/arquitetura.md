@@ -26,6 +26,9 @@ agentes de código                      interface
 │  sessions/   launcher, PTY, worktrees               │
 │  memory/     wiki git + índice SQLite + injeção     │
 │  handoffs    passagem de bastão entre agentes       │
+│  agent.py    agente autônomo e ferramentas locais   │
+│  skills      SKILL.md + versões e execuções          │
+│  cron        agenda e dispara tarefas autônomas     │
 │  harnesses/  adaptadores (hooks + MCP)              │
 │  security/   tokens locais, scanner de injeção      │
 │  events      barramento pub/sub                      │
@@ -106,6 +109,39 @@ POST /api/handoffs/{id}/claim         assume: inicia sessão em modo handoff
 > Ordem de registro importa: as rotas de handoff entram **antes** das de
 > sessão, senão `/api/sessions/{id}/{action}` captura `handoff` como ação
 > desconhecida.
+
+### Agente próprio, skills e automações
+```
+POST  /api/agent/runs                    inicia tarefa em modo autônomo
+POST  /api/agent/runs/{id}/stop          interrompe a tarefa
+GET   /api/skills                        lista skills indexadas
+POST  /api/skills                        cria SKILL.md
+GET   /api/skills/{name}                 lê skill
+PUT   /api/skills/{name}                 grava nova versão
+GET   /api/skills/{name}/history         histórico de versões
+GET   /api/skills/{name}/runs            histórico de execução
+GET   /api/automations                   lista tarefas agendadas
+POST  /api/automations                   cria cron
+PATCH /api/automations/{id}              edita ou pausa cron
+GET   /api/automations/{id}/runs         histórico de execução
+PATCH /api/projects/{id}/autonomy        opt-in e limites do projeto
+```
+
+`lea-agent` só inicia em projeto com `allow_autonomous = 1`. O agente recebe
+ferramentas de leitura e escrita restritas a caminhos dentro do projeto, além
+de execução de programas sem shell. Comandos que correspondem à lista global
+ou do projeto são recusados e encerram a tarefa para revisão manual. A execução
+de comandos permitidos ocorre com os privilégios locais do usuário.
+
+Skills ficam em `~/.lea/skills/<nome>/SKILL.md`; ao iniciar, o daemon importa
+novos arquivos e indexa edições. O Markdown guarda o conteúdo e o SQLite guarda
+versões e execuções. O scanner estrito impede injetar uma skill marcada. O cron aceita
+cinco campos numéricos e fuso IANA; o daemon
+calcula a próxima execução em UTC, faz claim antes de disparar e marca execuções
+inacabadas como interrompidas após reiniciar.
+
+Esta é a base da Fase 5. Revisão automática de skills, fluxo interativo de
+aprovação, custo monetário e canais ainda não estão ligados ao agente próprio.
 
 ## Invariantes que o código assume
 

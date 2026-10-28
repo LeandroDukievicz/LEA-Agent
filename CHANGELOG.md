@@ -5,6 +5,24 @@ Enquanto o LEA não tem release, cada entrada é uma fase da especificação.
 
 ## [Não publicado]
 
+### Fase 5 — base do agente, skills e cron (em andamento)
+
+- Agente próprio via Anthropic, com sessão, eventos, memória e limites de
+  duração, tokens, rodadas de ferramentas e concorrência.
+- Ferramentas para listar, ler e escrever arquivos do projeto e executar
+  programas sem shell; caminhos de arquivo ficam dentro do projeto e comandos
+  configurados para aprovação encerram a tarefa sem execução.
+- Opt-in de autonomia por projeto e endpoint para editar os limites e a lista
+  de comandos que exigem revisão.
+- Skills no formato Agent Skills em `~/.lea/skills`, importação de arquivos,
+  histórico de versões e execuções.
+- Agendador cron com cinco campos, fuso IANA, histórico de runs e recuperação
+  de execuções interrompidas pelo encerramento do daemon.
+- CLI `lea run` e rotas HTTP para iniciar tarefas, manter skills e agendar
+  instruções.
+- Revisão automática de skills, aprovação interativa, cálculo de custos e
+  canais de mensagem permanecem para etapas posteriores.
+
 ### Fase 4 — Handoffs
 
 - Geração de handoff no hook `Stop` e pelo `/handoff` do console, com

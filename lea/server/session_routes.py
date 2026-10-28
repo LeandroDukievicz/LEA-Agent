@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from typing import Annotated, Any
 
@@ -65,6 +66,9 @@ async def create_project(
     memory: MemoryDep,
     payload: Annotated[dict[str, Any], Body()],
 ) -> dict[str, Any]:
+    allow_autonomous = payload.get("allow_autonomous", False)
+    if not isinstance(allow_autonomous, bool):
+        raise HTTPException(status_code=422, detail="allow_autonomous precisa ser boolean")
     try:
         result = await projects.open_project(
             conn,
@@ -72,11 +76,64 @@ async def create_project(
             path=str(payload.get("path") or ""),
             name=payload.get("name"),
             index_docs=bool(payload.get("index_docs")),
-            allow_autonomous=bool(payload.get("allow_autonomous")),
+            allow_autonomous=allow_autonomous,
         )
     except projects.ProjectError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return result.as_dict()
+
+
+@router.patch("/projects/{project_id}/autonomy")
+async def update_project_autonomy(
+    conn: DbDep,
+    project_id: int,
+    payload: Annotated[dict[str, Any], Body()],
+) -> dict[str, Any]:
+    """Configura o opt-in e os limites do agente próprio do LEA."""
+    if "allow_autonomous" not in payload or not isinstance(payload["allow_autonomous"], bool):
+        raise HTTPException(status_code=422, detail="allow_autonomous boolean é obrigatório")
+    async with conn.execute("SELECT id FROM projects WHERE id = ?", (project_id,)) as cursor:
+        if await cursor.fetchone() is None:
+            raise HTTPException(status_code=404, detail=f"projeto desconhecido: {project_id}")
+
+    updates: dict[str, Any] = {"allow_autonomous": int(payload["allow_autonomous"])}
+    if "budget_brl_per_session" in payload:
+        raise HTTPException(
+            status_code=422,
+            detail="limite monetário por sessão ficará disponível quando o cálculo de custos for implementado",
+        )
+    if "max_duration_min" in payload:
+        value = payload["max_duration_min"]
+        if value is not None:
+            try:
+                value = int(value)
+            except (TypeError, ValueError) as exc:
+                raise HTTPException(status_code=422, detail="max_duration_min precisa ser inteiro ou null") from exc
+            if not 1 <= value <= 1440:
+                raise HTTPException(status_code=422, detail="max_duration_min precisa ficar entre 1 e 1440")
+        updates["max_duration_min"] = value
+    if "require_approval_for" in payload:
+        value = payload["require_approval_for"]
+        if not isinstance(value, list) or any(not isinstance(item, str) or not item.strip() for item in value):
+            raise HTTPException(status_code=422, detail="require_approval_for precisa ser uma lista de textos não vazios")
+        updates["require_approval_for"] = json.dumps(value, ensure_ascii=False)
+
+    assignment = ", ".join(f"{column} = ?" for column in updates)
+    await conn.execute(
+        f"UPDATE projects SET {assignment} WHERE id = ?",
+        (*updates.values(), project_id),
+    )
+    paused = 0
+    if not payload["allow_autonomous"]:
+        cursor = await conn.execute(
+            "UPDATE cron_jobs SET status = 'paused' WHERE project_id = ? AND status = 'active'",
+            (project_id,),
+        )
+        paused = cursor.rowcount or 0
+    await conn.commit()
+    items = await projects.listing(conn)
+    item = next((project for project in items if project["id"] == project_id), None)
+    return {"project": item, "paused_automations": paused}
 
 
 # ── harnesses ────────────────────────────────────────────────────────────

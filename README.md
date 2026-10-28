@@ -17,7 +17,7 @@ Diferente de um agente que quer substituir os outros, o LEA deixa cada agente
 continuar sendo ele mesmo e fica **entre** eles, como camada de memória e
 supervisão. Ver [docs/estudo-hermes.md](docs/estudo-hermes.md).
 
-## Estado: Fases 1 a 4 concluídas
+## Estado: Fases 1 a 4 concluídas; Fase 5 em andamento
 
 O núcleo é um **daemon headless** com API local, WebSocket de eventos e receptor
 de hooks. A interface é um cliente dele — é o que permite rodar sem janela num
@@ -29,7 +29,7 @@ homelab e trocar a camada visual sem mexer no produto.
 | ✅ Fase 2 | memória: wiki git, busca FTS, decaimento, grafo, injeção de contexto, servidor MCP |
 | ✅ Fase 3 | projetos, launcher, adaptadores de harness, hooks, PTY, worktrees |
 | ✅ Fase 4 | handoffs: geração no Stop, claim, injeção no contexto |
-| ⬜ Fase 5 | lea-agent, skills, cron |
+| 🟡 Fase 5 | lea-agent, skills, cron — execução e agendamento básicos implementados |
 | ⬜ Fase 6 | canais de mensagem |
 | ⬜ Fase 7 | custos, empacotamento |
 
@@ -64,6 +64,7 @@ lea hook      ponte chamada de dentro dos agentes de código
 lea mcp        servidor MCP lea.memory, por stdio
 lea harnesses  matriz de integração dos agentes; --install para configurar
 lea reindex    reconstrói o índice da memória a partir do git
+lea run        executa uma tarefa com o agente próprio do LEA
 lea doctor     diagnostica a instalação
 ```
 
@@ -131,6 +132,37 @@ Credencial vem de `ANTHROPIC_API_KEY` no ambiente.
 O LEA **não** usa a credencial do Claude Code nem de outra ferramenta
 instalada: aquela conta é daquele programa, e tomá-la emprestada seria gastar
 em chamadas que você não pediu.
+
+## Agente autônomo
+
+O `lea-agent` usa a chave Anthropic configurada no ambiente. O projeto precisa
+ter `allow_autonomous` habilitado; projetos novos começam com autonomia
+desligada. A configuração pode ser alterada pela API em
+`PATCH /api/projects/{id}/autonomy`.
+
+```bash
+uv run lea run --project 1 --task "revise o README e corrija links quebrados"
+uv run lea run --project 1 --task "prepare uma release" --skill release-checklist
+```
+
+O agente recebe contexto da wiki e, opcionalmente, uma skill. Suas ferramentas
+listam, leem e escrevem arquivos no projeto e executam programas com argumentos
+separados, sem shell. Caminhos de arquivo ficam dentro do projeto. Comandos que
+casam com `agent.require_approval_for` ou com a lista do projeto são bloqueados
+e encerram a tarefa para revisão manual. Comandos permitidos rodam como o
+usuário local, então habilite autonomia apenas em projetos que você confia.
+Cada tarefa tem limites de tempo,
+tokens, rodadas de ferramenta e concorrência em `config.toml`.
+
+Skills ficam em `~/.lea/skills/<nome>/SKILL.md`, no formato Agent Skills. O
+daemon indexa skills no início e recolhe edições feitas em disco; versões,
+histórico e execuções ficam no SQLite. Uma skill que o scanner estrito marcar
+não é injetada no prompt.
+
+Automações usam expressões cron de cinco campos e fuso IANA. O daemon dispara a
+instrução em linguagem natural no próximo horário configurado e registra cada
+execução. Canais de mensagem, revisão automática de skills e cálculo de custo
+monetário ficam para fases seguintes.
 
 ## Sessões
 
