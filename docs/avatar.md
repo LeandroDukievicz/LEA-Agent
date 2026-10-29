@@ -2,7 +2,7 @@
 
 O elemento `<lea-avatar>` reconstrói a arte de referência (`docs/reference/lea-portrait.jpg`) como um relevo de voxels em WebGL, com Three.js. Funciona localmente, sem conexão ou serviços externos.
 
-A referência corta o topo da cabeça na borda da imagem; o gerador reconstrói a calota antes de tudo, continuando o arco da silhueta até um ápice e esticando a última fileira de mechas sobre as linhas novas. O mapa final tem 96×105.
+A referência corta o topo da cabeça — e não só acima da borda: a cunha preta no canto superior esquerdo também é crânio, deixada de fora porque o enquadramento corta ali. O gerador reconstrói isso antes de tudo: ajusta uma elipse à linha mais larga de cabelo que o desenho mostra, leva até um ápice e preenche cada célula dentro dela que ainda seja fundo, tirando a cor das mechas que já estão logo abaixo — a calota sai da paleta que o cabelo dela já tem. O mapa final tem 96×105.
 
 Cada pixel vira uma caixa instanciada. A profundidade de cada caixa vem da silhueta borrada da própria arte, então a cabeça ganha volume, o implante óptico flutua à frente do rosto e as trilhas de neon pairam sobre a pele. As cores são as da referência: as classes de neon (implante, circuitos, luzes de fundo) são desenhadas sem iluminação para manter o croma original, e o resto recebe uma luz suave que só modula o relevo.
 

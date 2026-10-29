@@ -26,50 +26,59 @@ EYE_BOX = (55, 34 + CROWN, 16, 9)        # x, y, w, h -- the lid aperture; the b
 MOUTH_BOX = (44, 59 + CROWN, 13, 11)     # tall enough for the jaw to drop into
 
 
-def hair_edges(source, rows=6):
-    """Left and right edge of the hair mass for the first `rows` rows of the artwork."""
-    lum = source.max(axis=2)
-    edges = []
-    for y in range(rows):
-        lit = np.nonzero(lum[y] >= 10)[0]
-        lit = lit[lit > 56]                             # right of the HUD arc and the bangs
-        edges.append((lit.min(), lit.max()))
-    return edges
+HEAD_SPAN = (48, 92)             # columns the skull can occupy, clear of the HUD arc
+HEAD_APEX = 2.0                  # where the top of her head lands in the padded canvas
 
 
 def rebuild_crown(source):
-    """The reference frames her so the top of her skull is cut off by the border. Close it.
+    """The reference crops the top of her head, and not only above the border: the black
+    wedge at the upper left is skull too, left out because the frame cuts there.
 
-    Both edges of the hair are still converging at row 0, so the cap is the circular arc that
-    meets them tangentially: that fixes its height rather than leaving it to taste, and keeps
-    the crown a dome instead of the spike a straight continuation would give.
+    So this is not a cap bolted onto row 0. It fits an ellipse to the widest row of hair the
+    artwork does show, sweeps it up to an apex, and fills every cell inside it that is still
+    background -- taking each colour from the strands already below it, so the crown is built
+    out of the palette her hair already has instead of a flat invented pink.
     """
     out = np.zeros((H, W, 3), dtype=float)
     out[CROWN:] = source
+    lum = out.max(axis=2)
+    lo, hi = HEAD_SPAN
 
-    edges = hair_edges(source)
-    left, right = edges[0]
-    half = (right - left) / 2 + .5
-    centre = (left + right) / 2
-    # How fast each edge closes per row, averaged over the rows we can actually see.
-    closing = np.mean([(edges[y][0] - edges[y + 1][0]) + (edges[y + 1][1] - edges[y][1])
-                       for y in range(len(edges) - 1)]) / 2
-    # Circular cap of radius R whose base half-width is `half` and whose base slope is `closing`.
-    rise = half * (np.sqrt(closing ** 2 + 1) - closing)
-    radius = (half ** 2 + rise ** 2) / (2 * rise)
-    apex = CROWN - rise
+    # Widest row of hair in the upper half: that fixes the ellipse the skull sits on.
+    spans = {}
+    for y in range(CROWN, CROWN + 46):
+        lit = np.nonzero(lum[y] >= 25)[0]
+        lit = lit[(lit >= lo) & (lit < hi)]
+        if len(lit):
+            spans[y] = (lit.min(), lit.max())
+    widest = max(spans, key=lambda y: spans[y][1] - spans[y][0])
+    left, right = spans[widest]
+    centre, half = (left + right) / 2, (right - left) / 2 + .5
+    rise = widest - HEAD_APEX
 
-    row = source[0]
-    for y in range(max(0, int(np.floor(apex))), CROWN):
-        depth = y - apex                                # 0 at the apex, `rise` at the old row 0
-        if depth <= 0:
-            continue
-        width = np.sqrt(max(0.0, 2 * radius * depth - depth ** 2))
-        lean = .3 * (CROWN - y)                         # her head tilts, so the centre drifts
-        shade = .74 + .26 * (depth / rise)              # the crown turns away from the rim light
-        for x in range(int(round(centre + lean - width)), int(round(centre + lean + width)) + 1):
-            u = (x - centre - lean) / max(width, 1e-6)
-            out[y, x] = row[int(round(np.clip(centre + u * half, left, right)))] * shade
+    def strand(x, below):
+        """The nearest hair already drawn under this cell, so the new crown inherits it."""
+        for step in range(0, 46):
+            y = below + step
+            if y < H and lum[y, x] >= 40:
+                return out[y, x]
+        return None
+
+    for y in range(int(HEAD_APEX), widest):
+        width = half * np.sqrt(max(0.0, 1 - ((y - widest) / rise) ** 2))
+        shade = .68 + .32 * np.sqrt(max(0.0, 1 - ((y - widest) / rise) ** 2))
+        for x in range(int(round(centre - width)), int(round(centre + width)) + 1):
+            if not (lo <= x < hi) or lum[y, x] >= 14:    # never paint over the artwork
+                continue
+            source_colour = strand(x, y + 1)
+            if source_colour is None:                    # nothing below: borrow across the dome
+                mirror = int(round(centre + (centre - x)))
+                source_colour = strand(min(max(mirror, lo), hi - 1), y + 1)
+            if source_colour is None:
+                continue
+            # Darker to the left: the rim light in this artwork comes from her right.
+            lit_side = .78 + .22 * (x - (centre - width)) / max(2 * width, 1e-6)
+            out[y, x] = source_colour * shade * lit_side
     return out
 
 
