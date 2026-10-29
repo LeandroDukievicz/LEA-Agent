@@ -3,6 +3,11 @@
 <script>window.__resources = {"https://unpkg.com/react@18.3.1/umd/react.production.min.js":"assets/vendor/react.production.min.js","https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js":"assets/vendor/react-dom.production.min.js"};</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="assets/vendor/three.min.js"></script>
+<script src="assets/lea-portrait.js"></script>
+<script src="assets/lea-avatar.js"></script>
+<script src="assets/lea-waveform.js"></script>
+<script src="assets/lea-presence.js" defer></script>
 <script src="assets/dc-runtime.js"></script>
 </head>
 <body>
@@ -255,21 +260,36 @@
 }
 </style>
 <style>
-body{margin:0;background:#0a0a0f;color:#d7e3ee;-webkit-font-smoothing:antialiased}
+body{margin:0;background:#000;color:#d7e3ee;-webkit-font-smoothing:antialiased}
 a{color:#00f0ff;text-decoration:none}a:hover{color:#ff2bd6}
 ::selection{background:#ff2bd6;color:#0a0a0f}
 input::placeholder{color:#4f5d6e}
+.lea-shell{width:100%;grid-template-columns:232px minmax(0,1208px) minmax(320px,1fr)}
+.lea-avatar-panel{grid-column:3;grid-row:1;position:sticky;top:20px;align-self:start;padding:20px 20px 40px}
+.lea-avatar-panel>section{max-width:470px;margin-left:auto}
+@media (max-width:1650px){
+  .lea-shell{grid-template-columns:232px minmax(0,1fr)}
+  .lea-navigation{grid-column:1;grid-row:1 / span 2}
+  .lea-shell>main{grid-column:2;grid-row:2}
+  .lea-avatar-panel{grid-column:2;grid-row:1;position:static;padding:16px 28px 0}
+  .lea-avatar-panel>section{max-width:390px}
+}
+@media (max-width: 1100px) {
+  .lea-console {display:flex !important;flex-direction:column;height:auto !important;min-height:0 !important}
+  .lea-console > aside {display:contents !important}
+  .lea-console > section {min-height:620px !important}
+}
 @keyframes leaBlink{0%,50%{opacity:1}50.01%,100%{opacity:0}}
 @keyframes leaIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 </style>
 </helmet>
-<div style="width:1440px;min-height:100vh;display:grid;grid-template-columns:232px 1fr;position:relative;background:#0a0a0f;font-family:'JetBrains Mono',monospace;font-size:12px;color:#d7e3ee">
+<div class="lea-shell" style="min-height:100vh;display:grid;position:relative;background:#000;font-family:'JetBrains Mono',monospace;font-size:12px;color:#d7e3ee">
 
 <sc-if value="{{ scanlines }}" hint-placeholder-val="{{ true }}">
 <div style="position:fixed;inset:0;pointer-events:none;z-index:50;background:repeating-linear-gradient(0deg,rgba(255,255,255,.022) 0,rgba(255,255,255,.022) 1px,transparent 1px,transparent 3px)"></div>
 </sc-if>
 
-<aside style="position:sticky;top:0;height:calc(100vh - 28px);display:flex;flex-direction:column;border-right:1px solid #1a2733;background:#08090d">
+<aside class="lea-navigation" style="position:sticky;top:0;height:calc(100vh - 28px);display:flex;flex-direction:column;border-right:1px solid #1a2733;background:#000">
   <div style="padding:22px 20px 18px;border-bottom:1px solid #1a2733;display:flex;flex-direction:column;gap:6px">
     <div style="display:flex;align-items:baseline;gap:10px">
       <span style="font:700 34px/1 'Rajdhani',sans-serif;letter-spacing:.18em;color:#00f0ff;text-shadow:0 0 14px rgba(0,240,255,.55)">LEA</span>
@@ -319,12 +339,12 @@ input::placeholder{color:#4f5d6e}
 </aside>
 
 <main style="min-width:0;display:flex;flex-direction:column">
-  <header style="display:flex;align-items:center;gap:18px;padding:18px 28px;border-bottom:1px solid #1a2733;background:#0a0a0f;position:sticky;top:0;z-index:5">
+  <header style="display:flex;align-items:center;gap:18px;padding:18px 28px;border-bottom:1px solid #1a2733;background:#000;position:sticky;top:0;z-index:5">
     <span style="font:500 11px/1 'JetBrains Mono',monospace;color:#ff2bd6">// {{ screenNum }}</span>
     <h1 style="margin:0;font:700 26px/1 'Rajdhani',sans-serif;letter-spacing:.14em;color:#e6edf3">{{ screenTitle }}</h1>
     <span style="font:400 11px/1 'JetBrains Mono',monospace;color:#6b7a8c">{{ screenSub }}</span>
     <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
-      <div style="display:flex;align-items:center;gap:10px;width:260px;padding:8px 12px;border:1px solid #1a2733;background:#0c0e16;color:#6b7a8c;font:400 11px/1 'JetBrains Mono',monospace;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)">
+      <div style="display:flex;align-items:center;gap:10px;width:260px;padding:8px 12px;border:1px solid #1a2733;background:#000;color:#6b7a8c;font:400 11px/1 'JetBrains Mono',monospace;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)">
         <span style="color:#00f0ff">⌕</span><span style="flex:1">buscar memória, skills, sessões…</span><span style="border:1px solid #2a3a48;padding:2px 5px;font-size:10px">⌘K</span>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
@@ -341,7 +361,7 @@ input::placeholder{color:#4f5d6e}
 <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 420px;gap:16px">
   <div style="grid-column:1 / 4;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px">
     <sc-for list="{{ stats }}" as="s" hint-placeholder-count="4">
-      <div sc-camel-on-click="{{ s.go }}" style="cursor:pointer;background:#0c0e16;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:10px;box-shadow:inset 0 0 30px rgba(0,240,255,.04)">
+      <div sc-camel-on-click="{{ s.go }}" style="cursor:pointer;background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:10px;box-shadow:inset 0 0 30px rgba(0,240,255,.04)">
         <div style="display:flex;justify-content:space-between;font:500 10.5px/1 'JetBrains Mono',monospace;color:#6b7a8c;letter-spacing:.06em"><span>┌─ {{ s.label }}</span><span>{{ s.id }}</span></div>
         <div style="display:flex;align-items:baseline;gap:8px">
           <span style="font:700 44px/1 'Rajdhani',sans-serif;color:{{ s.color }};text-shadow:0 0 16px {{ s.glow }}">{{ s.value }}</span>
@@ -352,7 +372,7 @@ input::placeholder{color:#4f5d6e}
     </sc-for>
   </div>
 
-  <section style="grid-column:1 / 3;background:#0c0e16;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px">
+  <section style="grid-column:1 / 3;background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px">
     <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:12px"><span>┌─ AGENTES CONECTADOS ─┐</span><span style="color:#6b7a8c">refresh 1s · 6 harnesses</span></div>
     <div style="display:grid;grid-template-columns:30px 1.3fr 88px 70px 1fr 160px 64px;gap:10px;padding:0 0 8px;border-bottom:1px solid #1a2733;font:500 10px/1 'JetBrains Mono',monospace;color:#4f5d6e;letter-spacing:.08em">
       <span></span><span>AGENTE</span><span>STATUS</span><span>SESSÃO</span><span>PROJETO</span><span>CONTEXTO</span><span style="text-align:right">TOKENS</span>
@@ -370,7 +390,7 @@ input::placeholder{color:#4f5d6e}
     </sc-for>
   </section>
 
-  <section style="grid-column:3;grid-row:2 / 4;background:#0c0e16;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;min-height:0">
+  <section style="grid-column:3;grid-row:2 / 4;background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;min-height:0">
     <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:12px"><span>┌─ ATIVIDADE ─┐</span><span style="display:flex;align-items:center;gap:6px;color:#39ff88"><span style="width:6px;height:6px;background:#39ff88;box-shadow:0 0 6px #39ff88"></span>AO VIVO</span></div>
     <div style="display:flex;flex-direction:column;flex:1;overflow:hidden;max-height:560px">
       <sc-for list="{{ feed }}" as="f" hint-placeholder-count="12">
@@ -385,7 +405,7 @@ input::placeholder{color:#4f5d6e}
     <div style="margin-top:10px;padding-top:10px;border-top:1px solid #1a2733;font:400 11px/1 'JetBrains Mono',monospace;color:#6b7a8c;display:flex;gap:6px"><span style="color:#39ff88">lea@homelab</span><span>:~$ tail -f activity.log</span>{{ cursor }}</div>
   </section>
 
-  <section style="background:#0c0e16;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:14px">
+  <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:14px">
     <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff"><span>┌─ TOKENS / HORA ─┐</span><span style="color:#6b7a8c">hoje</span></div>
     <div style="display:flex;flex-direction:column;gap:4px">
       <span style="font:400 30px/1 'JetBrains Mono',monospace;color:#00f0ff;letter-spacing:1px;text-shadow:0 0 10px rgba(0,240,255,.45)">▁▁▁▁▁▁▂▃▅▆▇▅▃▄▆█</span>
@@ -403,7 +423,7 @@ input::placeholder{color:#4f5d6e}
     </div>
   </section>
 
-  <section style="background:#0c0e16;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:4px">
+  <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:4px">
     <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:8px"><span>┌─ PRÓXIMAS CRON ─┐</span><span sc-camel-on-click="{{ goAutomacoes }}" style="color:#ff2bd6;cursor:pointer">ver todas →</span></div>
     <sc-for list="{{ cronNext }}" as="c" hint-placeholder-count="4">
       <div style="display:grid;grid-template-columns:52px 1fr auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #121b24;font:400 11px/1.4 'JetBrains Mono',monospace">
@@ -424,7 +444,7 @@ input::placeholder{color:#4f5d6e}
       <span>┌─ PROJETOS ─┐</span><span style="color:#6b7a8c">{{ projCount }}</span>
     </div>
     <sc-for list="{{ projList }}" as="p" hint-placeholder-count="5">
-      <div sc-camel-on-click="{{ p.pick }}" style="cursor:pointer;background:#0c0e16;border:1px solid {{ p.border }};box-shadow:{{ p.shadow }};clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);padding:13px 14px;display:flex;flex-direction:column;gap:8px">
+      <div sc-camel-on-click="{{ p.pick }}" style="cursor:pointer;background:#000;border:1px solid {{ p.border }};box-shadow:{{ p.shadow }};clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);padding:13px 14px;display:flex;flex-direction:column;gap:8px">
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font:700 18px/1 'Rajdhani',sans-serif;letter-spacing:.06em;color:{{ p.nameColor }};flex:1">{{ p.id }}</span>
           <sc-for list="{{ p.badges }}" as="b" hint-placeholder-count="1">
@@ -443,7 +463,7 @@ input::placeholder{color:#4f5d6e}
   </div>
 
   <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
-    <section style="background:#0c0e16;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:18px 20px;display:flex;align-items:center;gap:18px">
+    <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:18px 20px;display:flex;align-items:center;gap:18px">
       <div style="display:flex;flex-direction:column;gap:8px;flex:1;min-width:0">
         <span style="font:700 30px/1 'Rajdhani',sans-serif;letter-spacing:.06em;color:#e6edf3">{{ P.id }}</span>
         <div style="display:flex;gap:14px;flex-wrap:wrap;font:400 11px/1 'JetBrains Mono',monospace;color:#8a99ab">
@@ -455,7 +475,7 @@ input::placeholder{color:#4f5d6e}
       <button style="cursor:pointer;background:transparent;color:#8a99ab;border:1px solid #2a3a48;font:700 12px/1 'Rajdhani',sans-serif;letter-spacing:.14em;padding:9px 14px">CONFIGURAR</button>
     </section>
 
-    <section style="background:#0c0e16;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px">
+    <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px">
       <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:10px"><span>┌─ AGENTES NESTE PROJETO ─┐</span><span style="color:#6b7a8c">controle ao vivo</span></div>
       <sc-if value="{{ noRunning }}" hint-placeholder-val="{{ false }}">
         <div style="padding:14px 0;font:400 11.5px/1.5 'JetBrains Mono',monospace;color:#6b7a8c">Nenhum agente rodando neste projeto. Use ▶ INICIAR AGENTE acima.</div>
@@ -484,7 +504,7 @@ input::placeholder{color:#4f5d6e}
 <!-- 03 MEMÓRIA -->
 <sc-if value="{{ isMemoria }}" hint-placeholder-val="{{ false }}">
 <div style="display:grid;grid-template-columns:250px minmax(0,1fr) 300px;gap:16px;height:calc(100vh - 168px);min-height:760px">
-  <section style="background:#0c0e16;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 12px;display:flex;flex-direction:column;gap:2px;overflow:auto">
+  <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 12px;display:flex;flex-direction:column;gap:2px;overflow:auto">
     <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin:0 4px 12px"><span>┌─ PROJETOS ─┐</span><span style="color:#6b7a8c">1.284</span></div>
     <sc-for list="{{ tree }}" as="t" hint-placeholder-count="14">
       <div sc-camel-on-click="{{ t.pick }}" style="display:flex;align-items:center;gap:6px;padding:6px 8px 6px {{ t.pad }};cursor:pointer;font:400 11.5px/1.2 'JetBrains Mono',monospace;color:{{ t.color }};background:{{ t.bg }};border-left:2px solid {{ t.bc }}">
@@ -493,7 +513,7 @@ input::placeholder{color:#4f5d6e}
     </sc-for>
   </section>
 
-  <section style="background:#0c0e16;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);display:flex;flex-direction:column;min-height:0">
+  <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);display:flex;flex-direction:column;min-height:0">
     <div style="display:flex;align-items:center;gap:2px;padding:10px 16px 0;border-bottom:1px solid #1a2733">
       <sc-for list="{{ memTabs }}" as="tb" hint-placeholder-count="2">
         <button sc-camel-on-click="{{ tb.go }}" style="border:0;cursor:pointer;background:{{ tb.bg }};color:{{ tb.color }};font:700 13px/1 'Rajdhani',sans-serif;letter-spacing:.14em;padding:9px 16px;border-bottom:2px solid {{ tb.bc }}">{{ tb.label }}</button>
@@ -543,7 +563,7 @@ input::placeholder{color:#4f5d6e}
   </section>
 
   <aside style="display:flex;flex-direction:column;gap:16px;overflow:auto">
-    <section style="background:#0c0e16;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+    <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:10px">
       <div style="font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:2px">┌─ METADADOS ─┐</div>
       <div style="display:flex;justify-content:space-between;font:400 11px/1 'JetBrains Mono',monospace"><span style="color:#6b7a8c">tier</span><span style="color:#00f0ff">WARM</span></div>
       <div style="display:flex;justify-content:space-between;font:400 11px/1 'JetBrains Mono',monospace"><span style="color:#6b7a8c">último acesso</span><span>há 2h · claude-code</span></div>
@@ -556,7 +576,7 @@ input::placeholder{color:#4f5d6e}
         <div style="display:flex;justify-content:space-between;font:400 9.5px/1 'JetBrains Mono',monospace;color:#4f5d6e"><span>agora</span><span>7d · 0.52</span><span>30d · 0.19</span></div>
       </div>
     </section>
-    <section style="background:#0c0e16;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:2px">
+    <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:2px">
       <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:8px"><span>┌─ VERSÕES GIT ─┐</span><span style="color:#6b7a8c">7</span></div>
       <sc-for list="{{ versions }}" as="v" hint-placeholder-count="3">
         <div style="display:flex;flex-direction:column;gap:4px;padding:8px 0;border-bottom:1px solid #121b24;font:400 11px/1.35 'JetBrains Mono',monospace">
@@ -566,7 +586,7 @@ input::placeholder{color:#4f5d6e}
         </div>
       </sc-for>
     </section>
-    <section style="background:#0c0e16;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:6px;font:400 11px/1.4 'JetBrains Mono',monospace">
+    <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:6px;font:400 11px/1.4 'JetBrains Mono',monospace">
       <div style="font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:4px">┌─ LINKS ─┐</div>
       <span style="color:#6b7a8c;font-size:10px">← ENTRADA (4)</span>
       <span style="color:#ff2bd6">tiers-e-promocao</span><span style="color:#ff2bd6">formato-handoff</span><span style="color:#ff2bd6">decisoes/adr-07-decaimento</span><span style="color:#ff2bd6">consolidacao-noturna</span>
@@ -580,7 +600,7 @@ input::placeholder{color:#4f5d6e}
 <!-- 03 SESSÕES & HANDOFFS -->
 <sc-if value="{{ isSessoes }}" hint-placeholder-val="{{ false }}">
 <div style="display:grid;grid-template-columns:minmax(0,1fr) 480px;gap:16px;align-items:start">
-  <section style="background:#0c0e16;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 18px">
+  <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 18px">
     <div style="display:flex;justify-content:space-between;align-items:center;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:14px">
       <span>┌─ LINHA DO TEMPO ─┐</span>
       <div style="display:flex;gap:6px">
@@ -598,7 +618,7 @@ input::placeholder{color:#4f5d6e}
           <span style="width:9px;height:9px;transform:rotate(45deg);background:{{ s.hColorSolid }};box-shadow:0 0 8px {{ s.hColorSolid }}"></span>
           <span style="width:2px;flex:1;background:#1a2733"></span>
         </div>
-        <div style="margin:6px 0;padding:11px 14px;border:1px solid #1a2733;background:#0a0c13;display:flex;flex-direction:column;gap:7px;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)">
+        <div style="margin:6px 0;padding:11px 14px;border:1px solid #1a2733;background:#000;display:flex;flex-direction:column;gap:7px;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)">
           <div style="display:flex;align-items:center;gap:10px;font:400 11px/1 'JetBrains Mono',monospace">
             <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:18px;font:700 10px/1 'JetBrains Mono',monospace;color:{{ s.hColor }};background:{{ s.hBg }};border:1px solid {{ s.hBorder }}">{{ s.hCode }}</span>
             <span style="color:#e6edf3">{{ s.agent }}</span>
@@ -616,7 +636,7 @@ input::placeholder{color:#4f5d6e}
   <div style="display:flex;flex-direction:column;gap:14px">
     <div style="display:flex;justify-content:space-between;align-items:baseline;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#ff2bd6"><span>┌─ HANDOFFS PENDENTES ─┐</span><span style="color:#6b7a8c">{{ pendingCount }} aguardando</span></div>
     <sc-for list="{{ handoffs }}" as="h" hint-placeholder-count="3">
-      <article style="background:#0c0e16;border:1px solid {{ h.border }};clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px);padding:16px 18px;display:flex;flex-direction:column;gap:12px;box-shadow:{{ h.shadow }};opacity:{{ h.opacity }}">
+      <article style="background:#000;border:1px solid {{ h.border }};clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px);padding:16px 18px;display:flex;flex-direction:column;gap:12px;box-shadow:{{ h.shadow }};opacity:{{ h.opacity }}">
         <div style="display:flex;align-items:center;gap:10px;font:400 11px/1 'JetBrains Mono',monospace">
           <span style="color:#ff2bd6">{{ h.id }}</span>
           <span style="color:#6b7a8c">de</span>
@@ -672,7 +692,7 @@ input::placeholder{color:#4f5d6e}
   </div>
   <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px">
     <sc-for list="{{ skills }}" as="k" hint-placeholder-count="9">
-      <article style="background:#0c0e16;border:1px solid {{ k.border }};clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:{{ k.shadow }}">
+      <article style="background:#000;border:1px solid {{ k.border }};clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:{{ k.shadow }}">
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font:500 10px/1 'JetBrains Mono',monospace;padding:3px 6px;color:{{ k.originColor }};border:1px solid {{ k.originColor }}">{{ k.origin }}</span>
           <sc-if value="{{ k.evolved }}" hint-placeholder-val="{{ false }}">
@@ -705,14 +725,14 @@ input::placeholder{color:#4f5d6e}
 <!-- 05 AUTOMAÇÕES -->
 <sc-if value="{{ isAutomacoes }}" hint-placeholder-val="{{ false }}">
 <div style="display:flex;flex-direction:column;gap:16px">
-  <section style="background:#0c0e16;border:1px solid #00f0ff;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;align-items:center;gap:14px;box-shadow:inset 0 0 30px rgba(0,240,255,.07)">
+  <section style="background:#000;border:1px solid #00f0ff;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;align-items:center;gap:14px;box-shadow:inset 0 0 30px rgba(0,240,255,.07)">
     <span style="font:500 11px/1 'JetBrains Mono',monospace;color:#00f0ff;letter-spacing:.06em">┌─ NOVA ─┐</span>
     <span style="flex:1;font:400 13px/1 'JetBrains Mono',monospace;color:#e6edf3">dias úteis às 7h30, checa a fila de deploy e me avisa no slack se tiver algo travado{{ cursor }}</span>
     <span style="font:400 11px/1 'JetBrains Mono',monospace;color:#6b7a8c">→ <span style="color:#ff2bd6">30 7 * * 1-5</span> · slack</span>
     <button style="border:0;cursor:pointer;background:#00f0ff;color:#0a0a0f;font:700 13px/1 'Rajdhani',sans-serif;letter-spacing:.14em;padding:9px 16px;clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)">AGENDAR</button>
   </section>
 
-  <section style="background:#0c0e16;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px">
+  <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px">
     <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:12px"><span>┌─ TAREFAS AGENDADAS ─┐</span><span style="color:#6b7a8c">6 tarefas · 1 alerta · 1 pausada</span></div>
     <div style="display:grid;grid-template-columns:minmax(0,1fr) 130px 130px 100px 200px;gap:14px;padding:0 10px 8px;border-bottom:1px solid #1a2733;font:500 10px/1 'JetBrains Mono',monospace;color:#4f5d6e;letter-spacing:.08em">
       <span>INSTRUÇÃO</span><span>CRON</span><span>PRÓXIMA</span><span>CANAL</span><span>ÚLTIMA EXECUÇÃO</span>
@@ -741,7 +761,7 @@ input::placeholder{color:#4f5d6e}
 
 <!-- 06 CONSOLE -->
 <sc-if value="{{ isConsole }}" hint-placeholder-val="{{ false }}">
-<div style="display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;height:calc(100vh - 168px);min-height:760px">
+<div class="lea-console" style="display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;height:calc(100vh - 168px);min-height:760px">
   <section style="background:#07080d;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);display:flex;flex-direction:column;min-height:0;position:relative">
     <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #1a2733;position:relative">
       <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:18px;font:700 10px/1 'JetBrains Mono',monospace;color:{{ th.hColor }};background:{{ th.hBg }};border:1px solid {{ th.hBorder }}">{{ th.hCode }}</span>
@@ -753,7 +773,7 @@ input::placeholder{color:#4f5d6e}
         <span style="color:#6b7a8c">model</span>{{ model }}<span>▾</span>
       </div>
       <sc-if value="{{ modelOpen }}" hint-placeholder-val="{{ false }}">
-        <div style="position:absolute;top:44px;left:170px;z-index:10;width:300px;background:#0c0e16;border:1px solid #00f0ff;box-shadow:0 10px 30px rgba(0,0,0,.6);display:flex;flex-direction:column">
+        <div style="position:absolute;top:44px;left:170px;z-index:10;width:300px;background:#000;border:1px solid #00f0ff;box-shadow:0 10px 30px rgba(0,0,0,.6);display:flex;flex-direction:column">
           <sc-for list="{{ models }}" as="m" hint-placeholder-count="4">
             <div sc-camel-on-click="{{ m.pick }}" style="display:flex;justify-content:space-between;padding:9px 12px;cursor:pointer;background:{{ m.bg }};font:400 11px/1 'JetBrains Mono',monospace;color:#e6edf3" style-hover="background:#121a26">
               <span>{{ m.name }}</span><span style="color:#6b7a8c">{{ m.meta }}</span>
@@ -763,7 +783,7 @@ input::placeholder{color:#4f5d6e}
       </sc-if>
       <span style="margin-left:auto;font:400 11px/1 'JetBrains Mono',monospace;color:#6b7a8c">ctx <span style="color:#00f0ff">▮▮▮▮▯▯▯▯▯▯</span> 38.2k / 200k</span>
     </div>
-    <div style="display:flex;align-items:center;gap:8px;padding:9px 16px;border-bottom:1px solid #1a2733;background:#0a0c13;font:400 10.5px/1 'JetBrains Mono',monospace;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:8px;padding:9px 16px;border-bottom:1px solid #1a2733;background:#000;font:400 10.5px/1 'JetBrains Mono',monospace;flex-wrap:wrap">
       <span style="color:#ff2bd6">◆ memória injetada</span>
       <sc-for list="{{ injected }}" as="i" hint-placeholder-count="3">
         <span style="padding:4px 7px;border:1px solid #3a1b37;color:#e6c3df;background:rgba(255,43,214,.06)">{{ i.slug }} <span style="color:#ff2bd6">{{ i.s }}</span></span>
@@ -779,7 +799,7 @@ input::placeholder{color:#4f5d6e}
           <div style="margin-left:62px;display:flex;gap:8px;font:400 11.5px/1.5 'JetBrains Mono',monospace;animation:leaIn .3s ease-out"><span style="color:#39ff88;width:12px">{{ m.mark }}</span><span style="color:{{ m.color }}">{{ m.text }}</span></div>
         </sc-if>
         <sc-if value="{{ m.isTool }}" hint-placeholder-val="{{ false }}">
-          <div style="margin-left:62px;border:1px solid #1a2733;background:#0c0e16;font:400 11.5px/1.5 'JetBrains Mono',monospace">
+          <div style="margin-left:62px;border:1px solid #1a2733;background:#000;font:400 11.5px/1.5 'JetBrains Mono',monospace">
             <div sc-camel-on-click="{{ m.toggle }}" style="display:flex;align-items:center;gap:10px;padding:7px 12px;cursor:pointer">
               <span style="color:#00f0ff;width:10px">{{ m.chev }}</span>
               <span style="color:#ff2bd6">{{ m.tool }}</span>
@@ -799,7 +819,7 @@ input::placeholder{color:#4f5d6e}
     </div>
     <div style="position:relative;padding:12px 16px 14px;border-top:1px solid #1a2733">
       <sc-if value="{{ showSlash }}" hint-placeholder-val="{{ false }}">
-        <div style="position:absolute;left:16px;bottom:62px;width:440px;background:#0c0e16;border:1px solid #00f0ff;box-shadow:0 -10px 30px rgba(0,0,0,.6);display:flex;flex-direction:column">
+        <div style="position:absolute;left:16px;bottom:62px;width:440px;background:#000;border:1px solid #00f0ff;box-shadow:0 -10px 30px rgba(0,0,0,.6);display:flex;flex-direction:column">
           <div style="padding:7px 12px;font:500 10px/1 'JetBrains Mono',monospace;color:#6b7a8c;border-bottom:1px solid #1a2733;letter-spacing:.08em">COMANDOS · ↑↓ navegar · tab completar</div>
           <sc-for list="{{ slashItems }}" as="c" hint-placeholder-count="5">
             <div sc-camel-on-click="{{ c.pick }}" style="display:grid;grid-template-columns:110px 1fr;gap:10px;padding:8px 12px;cursor:pointer;background:{{ c.bg }};font:400 11.5px/1.3 'JetBrains Mono',monospace">
@@ -808,7 +828,7 @@ input::placeholder{color:#4f5d6e}
           </sc-for>
         </div>
       </sc-if>
-      <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border:1px solid #00f0ff;background:#0a0c13;box-shadow:inset 0 0 20px rgba(0,240,255,.06)">
+      <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border:1px solid #00f0ff;background:#000;box-shadow:inset 0 0 20px rgba(0,240,255,.06)">
         <span style="color:#6b7a8c;font:400 16px/1 'JetBrains Mono',monospace;cursor:pointer" title="anexar arquivo ou página da wiki">+</span>
         <span style="color:#39ff88;font:500 13px/1 'JetBrains Mono',monospace">❯</span>
         <input value="{{ input }}" sc-camel-on-change="{{ onInput }}" sc-camel-on-key-down="{{ onKey }}" placeholder="fale com a lea ou digite / para comandos" style="flex:1;background:transparent;border:0;outline:none;color:#e6edf3;font:400 13px/1 'JetBrains Mono',monospace;caret-color:#00f0ff">
@@ -822,7 +842,7 @@ input::placeholder{color:#4f5d6e}
   </section>
 
   <aside style="display:flex;flex-direction:column;gap:16px">
-    <section style="background:#0c0e16;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:9px;font:400 11px/1 'JetBrains Mono',monospace">
+    <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:9px;font:400 11px/1 'JetBrains Mono',monospace">
       <div style="font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:3px">┌─ CONTEXTO ─┐</div>
       <div style="display:flex;justify-content:space-between"><span style="color:#6b7a8c">system + tools</span><span>9.1k</span></div>
       <div style="display:flex;justify-content:space-between"><span style="color:#6b7a8c">memória injetada</span><span style="color:#ff2bd6">6.4k</span></div>
@@ -830,13 +850,13 @@ input::placeholder{color:#4f5d6e}
       <div style="display:flex;justify-content:space-between;padding-top:9px;border-top:1px solid #1a2733"><span style="color:#6b7a8c">custo da sessão</span><span style="color:#e6edf3">R$ 0,84</span></div>
       <div style="display:flex;justify-content:space-between"><span style="color:#6b7a8c">compress em</span><span style="color:#f5ff3b">160k</span></div>
     </section>
-    <section style="background:#0c0e16;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:9px;font:400 11px/1.3 'JetBrains Mono',monospace">
+    <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:9px;font:400 11px/1.3 'JetBrains Mono',monospace">
       <div style="font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:3px">┌─ SKILLS CARREGADAS ─┐</div>
       <div style="display:flex;justify-content:space-between"><span>backup-restic</span><span style="color:#ff2bd6">v1.2</span></div>
       <div style="display:flex;justify-content:space-between"><span>responder-telegram</span><span style="color:#ff2bd6">v1.5</span></div>
       <div style="display:flex;justify-content:space-between"><span>atualizar-memoria</span><span style="color:#ff2bd6">v2.0</span></div>
     </section>
-    <section style="background:#0c0e16;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:9px;font:400 11px/1.3 'JetBrains Mono',monospace">
+    <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:9px;font:400 11px/1.3 'JetBrains Mono',monospace">
       <div style="font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:3px">┌─ SUBAGENTES ─┐</div>
       <div style="display:flex;justify-content:space-between;align-items:center"><span>pesquisa-b2-locks</span><span style="color:#39ff88">concluído</span></div>
       <div style="display:flex;justify-content:space-between;align-items:center"><span>verificar-integridade</span><span style="color:#00f0ff">▮▮▮▮▮▮▯▯▯▯</span></div>
@@ -848,7 +868,7 @@ input::placeholder{color:#4f5d6e}
 <!-- 07 CANAIS & AGENTES -->
 <sc-if value="{{ isCanais }}" hint-placeholder-val="{{ false }}">
 <div style="display:flex;flex-direction:column;gap:16px">
-  <section style="background:#0c0e16;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px">
+  <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px">
     <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:12px">
       <span>┌─ AGENTES DE CÓDIGO ─┐</span>
       <span style="display:flex;gap:14px;color:#6b7a8c"><span><span style="color:#39ff88">●</span> ativo</span><span><span style="color:#f5ff3b">◐</span> erro</span><span><span style="color:#3a4a5a">○</span> não instalado</span></span>
@@ -872,7 +892,7 @@ input::placeholder{color:#4f5d6e}
   <div style="display:flex;justify-content:space-between;align-items:baseline;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#ff2bd6;margin-top:6px"><span>┌─ GATEWAY DE MENSAGENS ─┐</span><span style="color:#6b7a8c">lea-gateway v0.8.2 · :7420 · uptime 12d 04h</span></div>
   <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px">
     <sc-for list="{{ platforms }}" as="p" hint-placeholder-count="4">
-      <article style="background:#0c0e16;border:1px solid {{ p.border }};clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:16px;display:flex;flex-direction:column;gap:12px">
+      <article style="background:#000;border:1px solid {{ p.border }};clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:16px;display:flex;flex-direction:column;gap:12px">
         <div style="display:flex;align-items:center;justify-content:space-between">
           <span style="font:700 22px/1 'Rajdhani',sans-serif;letter-spacing:.08em;color:#e6edf3">{{ p.name }}</span>
           <span style="display:flex;align-items:center;gap:6px;font:500 10px/1 'JetBrains Mono',monospace;color:{{ p.sColor }}"><span style="width:6px;height:6px;background:{{ p.sColor }};box-shadow:0 0 6px {{ p.sColor }}"></span>{{ p.sLabel }}</span>
@@ -894,7 +914,7 @@ input::placeholder{color:#4f5d6e}
   </div>
   <sc-if value="{{ modal }}" hint-placeholder-val="{{ false }}">
     <div style="position:fixed;inset:0;z-index:40;background:rgba(5,6,10,.78);display:flex;align-items:center;justify-content:center">
-      <div style="width:560px;background:#0c0e16;border:1px solid #00f0ff;clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px);padding:20px 22px;display:flex;flex-direction:column;gap:16px;box-shadow:inset 0 0 40px rgba(0,240,255,.08)">
+      <div style="width:560px;background:#000;border:1px solid #00f0ff;clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px);padding:20px 22px;display:flex;flex-direction:column;gap:16px;box-shadow:inset 0 0 40px rgba(0,240,255,.08)">
         <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff"><span>┌─ ABRIR PROJETO ─┐</span><span sc-camel-on-click="{{ closeModal }}" style="cursor:pointer;color:#6b7a8c">✕ esc</span></div>
         <div style="display:flex;flex-direction:column;gap:8px">
           <span style="font:500 10px/1 'JetBrains Mono',monospace;color:#6b7a8c;letter-spacing:.08em">CAMINHO LOCAL OU GIT URL</span>
@@ -917,9 +937,26 @@ input::placeholder{color:#4f5d6e}
     </div>
   </sc-if>
 </main>
+<aside class="lea-avatar-panel" aria-label="Avatar LEA">
+    <section style="background:#000;border:1px solid #1a2733;padding:12px;font:400 11px/1.4 'JetBrains Mono',monospace">
+      <div style="display:flex;justify-content:space-between;color:#00f0ff;letter-spacing:.06em;margin-bottom:8px"><span>┌─ AVATAR LEA ─┐</span><span style="color:#8a99ab">PRÉVIA</span></div>
+      <lea-avatar id="lea-face" style="height:312px"></lea-avatar>
+      <label for="avatar-expression" style="display:block;color:#8a99ab;margin-top:10px">Expressão</label>
+      <select id="avatar-expression" value="{{ avatarExpression }}" sc-camel-on-change="{{ onAvatarExpression }}" style="width:100%;margin-top:5px;padding:6px;background:#07080d;color:#e6edf3;border:1px solid #1a3944;font:inherit">
+        <option value="auto">Automática (contexto)</option><option value="neutral">Neutra</option><option value="listening">Ouvindo</option><option value="thinking">Pensando</option><option value="speaking">Falando</option>
+      </select>
+      <label for="avatar-speech" style="display:block;color:#8a99ab;margin-top:10px">Teste de fala</label>
+      <div style="display:flex;gap:6px;margin-top:5px">
+        <input id="avatar-speech" placeholder="Olá, eu sou a LEA." style="flex:1;min-width:0;padding:6px;background:#07080d;color:#e6edf3;border:1px solid #1a3944;font:inherit">
+        <button id="avatar-speak" type="button" style="padding:6px 10px;background:#07080d;color:#00f0ff;border:1px solid #1a3944;font:inherit;cursor:pointer">Falar</button>
+      </div>
+      <lea-waveform avatar="#lea-face" style="height:92px;margin-top:8px"></lea-waveform>
+      <div id="avatar-speech-note" style="color:#6b7a8c;margin-top:7px">A boca e a onda acompanham a voz do navegador.</div>
+    </section>
+</aside>
 <sc-if value="{{ launcher }}" hint-placeholder-val="{{ false }}">
   <div style="position:fixed;inset:0;z-index:40;background:rgba(5,6,10,.82);display:flex;align-items:center;justify-content:center">
-    <div style="width:900px;max-height:calc(100vh - 80px);overflow:auto;background:#0c0e16;border:1px solid #00f0ff;clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px);padding:20px 24px 22px;display:flex;flex-direction:column;gap:20px;box-shadow:inset 0 0 50px rgba(0,240,255,.07)">
+    <div style="width:900px;max-height:calc(100vh - 80px);overflow:auto;background:#000;border:1px solid #00f0ff;clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px);padding:20px 24px 22px;display:flex;flex-direction:column;gap:20px;box-shadow:inset 0 0 50px rgba(0,240,255,.07)">
       <div style="display:flex;justify-content:space-between;align-items:center"><span style="font:700 24px/1 'Rajdhani',sans-serif;letter-spacing:.14em;color:#00f0ff;text-shadow:0 0 12px rgba(0,240,255,.5)">NOVO AGENTE</span><span sc-camel-on-click="{{ closeLauncher }}" style="cursor:pointer;font:400 11px/1 'JetBrains Mono',monospace;color:#6b7a8c">✕ esc</span></div>
       <div style="display:flex;flex-direction:column;gap:10px">
         <div style="display:flex;align-items:center;gap:10px"><span style="font:700 11px/1 'JetBrains Mono',monospace;color:#0a0a0f;background:#00f0ff;padding:3px 5px">01</span><span style="font:700 15px/1 'Rajdhani',sans-serif;letter-spacing:.14em;color:#e6edf3">PROJETO</span><span style="font:400 10.5px/1 'JetBrains Mono',monospace;color:#6b7a8c">onde o agente vai trabalhar</span></div>
@@ -995,7 +1032,7 @@ input::placeholder{color:#4f5d6e}
     </div>
   </div>
 </sc-if>
-<footer style="position:fixed;left:0;bottom:0;width:1440px;height:28px;z-index:30;display:flex;align-items:center;gap:18px;padding:0 16px;box-sizing:border-box;background:#06070b;border-top:1px solid #1a2733;font:400 10.5px/1 'JetBrains Mono',monospace;color:#6b7a8c">
+<footer style="position:fixed;left:0;bottom:0;width:1440px;height:28px;z-index:30;display:flex;align-items:center;gap:18px;padding:0 16px;box-sizing:border-box;background:#000;border-top:1px solid #1a2733;font:400 10.5px/1 'JetBrains Mono',monospace;color:#6b7a8c">
   <span style="display:flex;align-items:center;gap:6px;color:#39ff88"><span style="width:6px;height:6px;background:#39ff88;box-shadow:0 0 6px #39ff88"></span>gateway pronto :7420</span>
   <span sc-camel-on-click="{{ goProjetos }}" style="cursor:pointer;color:#00f0ff">◌ {{ runningCount }} agentes rodando</span>
   <span sc-camel-on-click="{{ goAutomacoes }}" style="cursor:pointer">◷ cron 14:30 · certificados TLS</span>
@@ -1074,7 +1111,7 @@ class Component extends DCLogic {
   state={
     screen:this.props.startScreen||'overview', now:new Date(2026,9,27,14,3,2), memTab:'page', treeSel:'decaimento',
     sessFilter:'ALL', skillFilter:'Todas', claimed:{}, cronSel:2, modelOpen:false, model:'claude-sonnet-4.5',
-    input:'/', expanded:{t2:true}, extraMsgs:[], liveFeed:[], feedN:0,
+    input:'/', expanded:{t2:true}, extraMsgs:[], liveFeed:[], feedN:0, avatarExpression:'auto',
     projects:PROJ0, projSel:'lea-core', lAgent:'CC', lMode:'interativo', lBranch:'feat/', lTask:'', lWorktree:true, lMemOff:{}, boot:null,
     modal:false, npPath:'', npName:'', thread:'s-c4d2', pins:{'s-c4d2':true}, launcher:false, lProj:'lea-core'
   };
@@ -1401,6 +1438,7 @@ class Component extends DCLogic {
       sessions, sessFilters, handoffs, pendingCount:pending,
       skills, skillFilters, crons, selCron,
       messages, input:s.input, showSlash, slashItems, models, modelOpen:s.modelOpen, model:s.model, injected,
+      avatarExpression:s.avatarExpression, onAvatarExpression:e=>set({avatarExpression:e.target.value}),
       toggleModel:()=>set({modelOpen:!s.modelOpen}),
       onInput:e=>set({input:e.target.value}),
       onKey:e=>{if(e.key==='Enter'&&s.input.trim()){const t=s.input.trim();set({input:'',extraMsgs:[...s.extraMsgs,{isUser:true,text:t},{isAgent:true,text:t.startsWith('/')?`Comando ${t.split(' ')[0]} executado.`:'Entendido. Vou registrar isso na memória e te aviso quando terminar.'}]})}
@@ -1411,5 +1449,31 @@ class Component extends DCLogic {
 }
 </script>
 
+<script>
+// Botão de teste de fala: delegado no document para sobreviver às re-renderizações do runtime.
+document.addEventListener('click', event => {
+  const button = event.target.closest && event.target.closest('#avatar-speak');
+  if (!button) return;
+  const avatar = document.querySelector('lea-avatar');
+  const field = document.getElementById('avatar-speech');
+  const note = document.getElementById('avatar-speech-note');
+  const text = ((field && (field.value || field.placeholder)) || '').trim();
+  if (!avatar || !avatar.speak || !text) return;
+  button.disabled = true;
+  if (note) note.textContent = 'Falando…';
+  window.LeaPresence && window.LeaPresence.signal('reply', {});
+  avatar.speak(text)
+    .then(() => { if (note) note.textContent = 'A boca acompanha a voz do navegador.'; })
+    .catch(error => { if (note) note.textContent = 'Sem voz disponível: ' + (error && error.message || error); })
+    .then(() => { button.disabled = false; });
+});
+
+// A expressão é escolhida sozinha pelo contexto; o seletor só serve para forçar uma delas.
+document.addEventListener('change', event => {
+  if (event.target.id !== 'avatar-expression' || !window.LeaPresence) return;
+  const value = event.target.value;
+  window.LeaPresence.setAuto(value === 'auto', value);
+});
+</script>
 
 </body></html>

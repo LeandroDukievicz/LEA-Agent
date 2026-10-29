@@ -385,6 +385,14 @@ python3 -m http.server 8731
 Telas: Overview, Projetos, Console, Memória, Skills, Histórico & Handoffs,
 Automações, Canais & Agentes.
 
+O painel lateral traz o avatar 3D com quatro expressões (neutra, ouvindo,
+pensando, falando), escolhidas automaticamente pelo contexto: ela ouve enquanto
+você digita, pensa enquanto o Codex trabalha e fala a resposta em voz alta, com
+a boca e o gráfico de onda sincronizados. A lente óptica fica vermelha enquanto
+ela pensa. Com `window.LEA_API` configurado, o chat vai para o agente real
+(`POST /api/agent/runs`, backend `codex`); sem isso a página segue como
+demonstração. Veja [Avatar LEA](docs/avatar.md).
+
 Interface em português do Brasil; código, tabelas e APIs em inglês.
 
 ## Documentação
