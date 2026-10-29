@@ -82,9 +82,49 @@ class AgentConfig(BaseModel):
     )
 
 
+class ModelTokenPricing(BaseModel):
+    input_usd_per_million: float = Field(ge=0)
+    output_usd_per_million: float = Field(ge=0)
+    cache_write_5m_usd_per_million: float | None = Field(default=None, ge=0)
+    cache_write_1h_usd_per_million: float | None = Field(default=None, ge=0)
+    cache_read_usd_per_million: float | None = Field(default=None, ge=0)
+
+
 class CostsConfig(BaseModel):
     daily_budget_brl: float = Field(default=40.0, ge=0)
     usd_brl: float = Field(default=5.40, gt=0)
+    model_prices_usd_per_million: dict[str, ModelTokenPricing] = Field(
+        default_factory=lambda: {
+            "claude-sonnet-5": ModelTokenPricing(
+                input_usd_per_million=2.0,
+                output_usd_per_million=10.0,
+                cache_write_5m_usd_per_million=2.5,
+                cache_write_1h_usd_per_million=4.0,
+                cache_read_usd_per_million=0.2,
+            ),
+            "claude-sonnet-5-5": ModelTokenPricing(
+                input_usd_per_million=2.0,
+                output_usd_per_million=10.0,
+                cache_write_5m_usd_per_million=2.5,
+                cache_write_1h_usd_per_million=4.0,
+                cache_read_usd_per_million=0.2,
+            ),
+            "claude-sonnet-4-6": ModelTokenPricing(
+                input_usd_per_million=1.5,
+                output_usd_per_million=7.5,
+                cache_write_5m_usd_per_million=1.875,
+                cache_write_1h_usd_per_million=3.0,
+                cache_read_usd_per_million=0.15,
+            ),
+            "claude-sonnet-4-5": ModelTokenPricing(
+                input_usd_per_million=1.5,
+                output_usd_per_million=7.5,
+                cache_write_5m_usd_per_million=1.875,
+                cache_write_1h_usd_per_million=3.0,
+                cache_read_usd_per_million=0.15,
+            ),
+        }
+    )
 
 
 class UIConfig(BaseModel):

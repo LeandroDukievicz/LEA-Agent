@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 from typing import Annotated, Any
 
 import aiosqlite
@@ -98,10 +99,20 @@ async def update_project_autonomy(
 
     updates: dict[str, Any] = {"allow_autonomous": int(payload["allow_autonomous"])}
     if "budget_brl_per_session" in payload:
-        raise HTTPException(
-            status_code=422,
-            detail="limite monetário por sessão ficará disponível quando o cálculo de custos for implementado",
-        )
+        value = payload["budget_brl_per_session"]
+        if value is not None:
+            if isinstance(value, bool):
+                raise HTTPException(status_code=422, detail="budget_brl_per_session precisa ser número ou null")
+            try:
+                value = float(value)
+            except (TypeError, ValueError) as exc:
+                raise HTTPException(
+                    status_code=422,
+                    detail="budget_brl_per_session precisa ser número ou null",
+                ) from exc
+            if not math.isfinite(value) or value < 0:
+                raise HTTPException(status_code=422, detail="budget_brl_per_session não pode ser negativo")
+        updates["budget_brl_per_session"] = value
     if "max_duration_min" in payload:
         value = payload["max_duration_min"]
         if value is not None:

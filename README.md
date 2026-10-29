@@ -10,8 +10,8 @@ O que ele une:
    Gemini CLI, Cursor, Aider) — uma wiki em Markdown versionada em git, com
    força/decaimento por página, busca, backlinks e handoffs entre agentes.
 2. **Um agente autônomo próprio (lea-agent)** — aprende e melhora skills, roda
-   tarefas agendadas escritas em linguagem natural, delega para subagentes e
-   conversa por Telegram, Discord, Slack e WhatsApp.
+   tarefas agendadas escritas em linguagem natural e conversa por Telegram e
+   Discord.
 
 Diferente de um agente que quer substituir os outros, o LEA deixa cada agente
 continuar sendo ele mesmo e fica **entre** eles, como camada de memória e
@@ -29,9 +29,9 @@ homelab e trocar a camada visual sem mexer no produto.
 | ✅ Fase 2 | memória: wiki git, busca FTS, decaimento, grafo, injeção de contexto, servidor MCP |
 | ✅ Fase 3 | projetos, launcher, adaptadores de harness, hooks, PTY, worktrees |
 | ✅ Fase 4 | handoffs: geração no Stop, claim, injeção no contexto |
-| 🟡 Fase 5 | lea-agent, skills, cron — backends Codex CLI, Claude Code e Anthropic API |
-| ⬜ Fase 6 | canais de mensagem |
-| ⬜ Fase 7 | custos, empacotamento |
+| 🟡 Fase 5 | lea-agent, skills e cron — aprovações nativas dos CLIs pendentes |
+| ✅ Fase 6 | bots Telegram e Discord com allowlist e rotas por projeto |
+| 🟡 Fase 7 | custo estimado da Anthropic API; empacotamento pendente |
 
 A camada de interface ainda não foi escolhida — ver [Protótipo](#protótipo).
 
@@ -183,22 +183,104 @@ nativas de comandos Bash no Claude Code. O modo `auto` do Claude não abre
 prompts de permissão; comandos protegidos são recusados durante a tarefa, sem
 entrar na fila de aprovação humana. O LEA impõe limite de duração aos três
 backends. Limites de tokens do agente e métricas de custo continuam disponíveis
-apenas no modo API e em fases posteriores; para o consumo dos CLIs, consulte o
-próprio Codex ou Claude Code. Habilite autonomia somente em projetos nos quais
-você confia.
+apenas no modo `anthropic-api`; para o consumo dos CLIs, consulte o próprio
+Codex ou Claude Code. Habilite autonomia somente em projetos nos quais você
+confia.
 
 Uma automação cron guarda seu `backend`. Se omitido, usa `agent.default_backend`;
 automações existentes passam a usar Codex após a migração.
 
 Skills ficam em `~/.lea/skills/<nome>/SKILL.md`, no formato Agent Skills. O
 daemon indexa skills no início e recolhe edições feitas em disco; versões,
-histórico e execuções ficam no SQLite. Uma skill que o scanner estrito marcar
-não é injetada no prompt.
+histórico e execuções ficam no SQLite. Ao executar `anthropic-api` com uma
+skill selecionada, o agente pode propor uma melhoria com base no que aprendeu.
+Por padrão, a proposta exige revisão:
+
+```bash
+uv run lea skills proposals list
+uv run lea skills proposals show 12
+uv run lea skills proposals apply 12
+# ou
+uv run lea skills proposals reject 12
+```
+
+A API autenticada também lista propostas em `GET /api/skills/proposals`, exibe
+uma proposta em `GET /api/skills/proposals/{id}` e aceita as ações `apply` e
+`reject`. Para aplicar direto, configure `~/.lea/config.toml`:
+
+```toml
+[agent]
+auto_apply_skill_updates = true
+```
+
+Todas as propostas passam pelo scanner estrito; uma skill marcada não é
+injetada no prompt. Propostas baseadas numa versão que já mudou entram em
+conflito e precisam ser geradas novamente.
+
+## Custos e limites
+
+`anthropic-api` registra tokens e custo em cada chamada, converte para reais
+com `costs.usd_brl` e respeita o orçamento diário e o orçamento por sessão do
+projeto. O resumo pode ser consultado pelo terminal ou pela API:
+
+```bash
+uv run lea costs --days 30
+```
+
+`GET /api/overview` inclui o gasto de hoje; `GET /api/costs?days=30` traz o
+histórico por dia e modelo. Configure `budget_brl_per_session` por
+`PATCH /api/projects/{id}/autonomy`. Os limites são verificados após cada
+resposta do modelo, então uma resposta pode ultrapassar o limite antes que a
+execução pare.
+
+O padrão inclui preços por token para Claude Sonnet 5, Sonnet 5.5, Sonnet 4.6 e
+Sonnet 4.5; o preço de Sonnet 5 é US$ 2 por milhão de tokens de entrada e US$ 10
+por milhão de saída, conforme a [tabela oficial da Anthropic](https://platform.claude.com/docs/en/about-claude/pricing).
+Modelos sem preço configurado não podem iniciar pelo backend API. Ajuste os
+valores em `[costs.model_prices_usd_per_million]` ao usar outros modelos ou
+preços regionais. Execuções pelo Codex CLI e Claude Code continuam mostrando
+tokens, mas não recebem custo monetário no LEA.
 
 Automações usam expressões cron de cinco campos e fuso IANA. O daemon dispara a
 instrução em linguagem natural no próximo horário configurado e registra cada
-execução. Canais de mensagem, revisão automática de skills e cálculo de custo
-monetário ficam para fases seguintes.
+execução.
+
+## Canais Telegram e Discord
+
+Cada rota associa um chat ou canal a um projeto com autonomia habilitada e a
+uma lista explícita de usuários autorizados. Os bots encaminham mensagens de
+texto ao `lea-agent`, devolvem o resumo da execução e podem aprovar ou recusar
+comandos protegidos no backend `anthropic-api`. Chats de grupo só recebem
+tarefas quando a mensagem começa com `/lea` no Telegram, ou menciona o bot / usa
+`!lea` no Discord. O ID `*` configura mensagens privadas para os usuários
+listados.
+
+```bash
+uv run lea channels add telegram --chat-id '*' --project 1 --user-id 123456789
+export LEA_TELEGRAM_BOT_TOKEN='token-do-bot'
+uv run lea daemon
+```
+
+No Discord, instale o extra e habilite [`Message Content Intent`](https://discord.com/developers/docs/events/gateway#message-content-intent)
+no portal do bot antes de iniciar o daemon:
+
+```bash
+uv sync --extra discord
+uv run lea channels add discord --chat-id '*' --project 1 --user-id 123456789
+export LEA_DISCORD_BOT_TOKEN='token-do-bot'
+uv run lea daemon
+```
+
+Para grupos, informe o ID do grupo/canal em `--chat-id`; mantenha `--user-id`
+limitado às pessoas autorizadas. Os tokens são lidos do ambiente e não são
+gravados no banco. Use `lea channels list` para conferir as rotas e
+`lea channels remove <plataforma> --chat-id <id>` para removê-las. A configuração
+é recarregada ao reiniciar o daemon.
+
+Rotas também podem ser gerenciadas pela API autenticada: `GET /api/channels`,
+`POST /api/channels/routes` e `DELETE /api/channels/routes`. O último POST e o
+DELETE recebem plataforma e `remote_id`; a criação também recebe `project_id`,
+`allowed_user_ids` e, opcionalmente, `backend`.
 
 ## Sessões
 

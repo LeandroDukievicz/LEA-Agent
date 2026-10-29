@@ -43,6 +43,28 @@ approval_commands = typer.Typer(
 )
 app.add_typer(approval_commands, name="approvals")
 
+skill_commands = typer.Typer(
+    name="skills",
+    help="Consulta skills e revisa propostas do agente.",
+    no_args_is_help=True,
+    add_completion=False,
+)
+skill_proposal_commands = typer.Typer(
+    name="proposals",
+    help="Lista, inspeciona, aplica ou recusa propostas de skill.",
+    no_args_is_help=True,
+    add_completion=False,
+)
+channel_commands = typer.Typer(
+    name="channels",
+    help="Configura bots Telegram e Discord para o agente próprio.",
+    no_args_is_help=True,
+    add_completion=False,
+)
+app.add_typer(skill_commands, name="skills")
+skill_commands.add_typer(skill_proposal_commands, name="proposals")
+app.add_typer(channel_commands, name="channels")
+
 
 @app.callback()
 def _root(
@@ -59,6 +81,157 @@ def _root(
 def version() -> None:
     """Mostra a versão."""
     console.print(f"lea {__version__}")
+
+
+@app.command("costs")
+def show_costs(days: int = typer.Option(30, help="Dias de histórico (1 a 365).")) -> None:
+    """Mostra o gasto estimado pela API e o orçamento diário."""
+    if not 1 <= days <= 365:
+        raise typer.BadParameter("days precisa ficar entre 1 e 365")
+
+    async def load_costs() -> tuple[list[dict[str, Any]], float]:
+        paths.ensure_layout()
+        async with db.connection() as conn:
+            async with conn.execute(
+                "SELECT date(at, 'localtime') AS day, SUM(cost_usd) AS cost_usd, "
+                "SUM(cost_brl) AS cost_brl FROM costs "
+                "WHERE date(at, 'localtime') >= date('now', 'localtime', ?) "
+                "GROUP BY day ORDER BY day DESC",
+                (f"-{days - 1} days",),
+            ) as cursor:
+                rows = [dict(row) for row in await cursor.fetchall()]
+            today = await status.cost_today_brl(conn)
+        return rows, today
+
+    config = load()
+    rows, today = asyncio.run(load_costs())
+    table = Table(title=f"Custos Anthropic API · últimos {days} dias")
+    table.add_column("Dia")
+    table.add_column("USD", justify="right")
+    table.add_column("BRL", justify="right")
+    for row in rows:
+        table.add_row(
+            str(row["day"]),
+            f"${float(row['cost_usd'] or 0):.4f}",
+            f"R$ {float(row['cost_brl'] or 0):.2f}",
+        )
+    if rows:
+        console.print(table)
+    else:
+        console.print("Nenhum custo de API registrado nesse período.")
+    console.print(
+        f"Hoje: R$ {today:.2f} / R$ {config.costs.daily_budget_brl:.2f} "
+        "de orçamento diário."
+    )
+
+
+@channel_commands.command("add")
+def add_channel_route(
+    platform: Annotated[str, typer.Argument(help="Plataforma: telegram ou discord.")],
+    chat_id: Annotated[
+        str,
+        typer.Option("--chat-id", help="ID numérico do chat/canal; * para DMs autorizadas."),
+    ],
+    project_id: Annotated[int, typer.Option("--project", help="Projeto com autonomia habilitada.")],
+    user_ids: Annotated[
+        list[str],
+        typer.Option("--user-id", help="ID de usuário autorizado; repita a opção."),
+    ],
+    backend: Annotated[
+        str | None,
+        typer.Option("--backend", help="Backend: codex, claude-code ou anthropic-api."),
+    ] = None,
+) -> None:
+    """Autoriza usuários específicos a iniciar tarefas em um projeto."""
+    from lea import channels
+
+    async def configure() -> dict[str, Any]:
+        paths.ensure_layout()
+        async with db.connection() as conn:
+            return await channels.configure_route(
+                conn,
+                platform=platform,
+                remote_id=chat_id,
+                project_id=project_id,
+                allowed_user_ids=user_ids,
+                backend=backend,
+            )
+
+    try:
+        route = asyncio.run(configure())
+    except channels.ChannelError as exc:
+        err_console.print(f"[red]não foi possível configurar o canal:[/] {exc}")
+        raise typer.Exit(2) from exc
+    token_env = channels.PLATFORMS[platform][1]
+    console.print(
+        f"Rota [cyan]{platform}:{route['remote_id']}[/] → projeto {route['project_id']} salva. "
+        f"Defina {token_env} no ambiente do daemon e reinicie-o para conectar."
+    )
+
+
+@channel_commands.command("remove")
+def remove_channel_route(
+    platform: Annotated[str, typer.Argument(help="Plataforma: telegram ou discord.")],
+    chat_id: Annotated[
+        str,
+        typer.Option("--chat-id", help="ID da rota, ou * para DMs autorizadas."),
+    ],
+) -> None:
+    """Remove uma rota autorizada de um canal."""
+    from lea import channels
+
+    async def remove() -> bool:
+        paths.ensure_layout()
+        async with db.connection() as conn:
+            return await channels.remove_route(conn, platform=platform, remote_id=chat_id)
+
+    try:
+        removed = asyncio.run(remove())
+    except channels.ChannelError as exc:
+        err_console.print(f"[red]não foi possível remover a rota:[/] {exc}")
+        raise typer.Exit(2) from exc
+    if not removed:
+        err_console.print(f"[red]rota não encontrada:[/] {platform}:{chat_id}")
+        raise typer.Exit(1)
+    console.print(
+        f"Rota [cyan]{platform}:{chat_id}[/] removida. Reinicie o daemon para aplicar."
+    )
+
+
+@channel_commands.command("list")
+def list_channel_routes() -> None:
+    """Lista as rotas e o estado de conexão dos bots."""
+    from lea import channels
+
+    async def load_channels() -> list[dict[str, Any]]:
+        paths.ensure_layout()
+        async with db.connection() as conn:
+            return await channels.list_channels(conn)
+
+    items = asyncio.run(load_channels())
+    if not items:
+        console.print("Nenhum canal configurado. Use `lea channels add` para criar uma rota.")
+        return
+    table = Table(title="Canais de mensagem")
+    table.add_column("Plataforma")
+    table.add_column("Estado")
+    table.add_column("Chat → projeto")
+    table.add_column("Usuários autorizados")
+    for item in items:
+        routes = item["routes"]
+        if routes:
+            for route in routes:
+                table.add_row(
+                    item["platform"],
+                    item["status"],
+                    f"{route['remote_id']} → {route['project_id']}",
+                    ", ".join(route["allowed_user_ids"]),
+                )
+        else:
+            table.add_row(item["platform"], item["status"], "—", "—")
+        if item.get("last_error"):
+            err_console.print(f"{item['platform']}: {item['last_error']}")
+    console.print(table)
 
 
 @approval_commands.command("list")
@@ -136,6 +309,99 @@ def _decide_pending_action(approval_id: str, decision: str) -> None:
         raise typer.Exit(1)
     decision_label = "aprovada" if decision == "approve" else "recusada"
     console.print(f"Ação {decision_label}; sessão [cyan]{session_id}[/] retomada.")
+
+
+@skill_proposal_commands.command("list")
+def list_skill_proposals_cli() -> None:
+    """Lista propostas de skill aguardando revisão."""
+    from lea import skills
+
+    async def load_proposals() -> list[dict[str, Any]]:
+        paths.ensure_layout()
+        async with db.connection() as conn:
+            return await skills.list_proposals(conn, "pending")
+
+    proposals = asyncio.run(load_proposals())
+    if not proposals:
+        console.print("Nenhuma proposta de skill pendente.")
+        return
+    table = Table(title="Propostas de skill")
+    table.add_column("ID", style="cyan")
+    table.add_column("Skill")
+    table.add_column("Versão")
+    table.add_column("Motivo")
+    table.add_column("Sessão")
+    for proposal in proposals:
+        table.add_row(
+            str(proposal["id"]),
+            str(proposal["skill_name"]),
+            f"{proposal['base_version']} → {proposal['proposed_version']}",
+            str(proposal["reason"]),
+            str(proposal.get("session_id") or "—"),
+        )
+    console.print(table)
+
+
+@skill_proposal_commands.command("show")
+def show_skill_proposal(
+    proposal_id: Annotated[int, typer.Argument(help="Id exibido na lista de propostas.")],
+) -> None:
+    """Exibe o diff de uma proposta para revisão."""
+    from lea import skills
+
+    async def load_proposal() -> dict[str, Any] | None:
+        paths.ensure_layout()
+        async with db.connection() as conn:
+            return await skills.get_proposal(conn, proposal_id)
+
+    proposal = asyncio.run(load_proposal())
+    if proposal is None:
+        err_console.print(f"[red]proposta desconhecida:[/] {proposal_id}")
+        raise typer.Exit(1)
+    console.print(
+        f"[cyan]{proposal['skill_name']}[/] v{proposal['base_version']} → "
+        f"v{proposal['proposed_version']} · {proposal['status']}"
+    )
+    console.print(f"Motivo: {proposal['reason']}")
+    console.print(proposal["diff"] or "(sem diff)", markup=False, highlight=False)
+
+
+@skill_proposal_commands.command("apply")
+def apply_skill_proposal_cli(
+    proposal_id: Annotated[int, typer.Argument(help="Id exibido na lista de propostas.")],
+) -> None:
+    """Aplica uma proposta pendente após revisão."""
+    from lea import skills
+
+    async def apply() -> skills.SkillDocument:
+        paths.ensure_layout()
+        async with db.connection() as conn:
+            return await skills.apply_proposal(conn, proposal_id)
+
+    try:
+        updated = asyncio.run(apply())
+    except skills.SkillError as exc:
+        err_console.print(f"[red]não foi possível aplicar:[/] {exc}")
+        raise typer.Exit(1) from exc
+    console.print(f"Skill [cyan]{updated.name}[/] aplicada na versão {updated.version}.")
+
+
+@skill_proposal_commands.command("reject")
+def reject_skill_proposal_cli(
+    proposal_id: Annotated[int, typer.Argument(help="Id exibido na lista de propostas.")],
+) -> None:
+    """Recusa uma proposta pendente."""
+    from lea import skills
+
+    async def reject() -> bool:
+        paths.ensure_layout()
+        async with db.connection() as conn:
+            return await skills.reject_proposal(conn, proposal_id)
+
+    if not asyncio.run(reject()):
+        err_console.print(f"[red]proposta pendente não encontrada:[/] {proposal_id}")
+        raise typer.Exit(1)
+    console.print(f"Proposta [cyan]#{proposal_id}[/] recusada.")
 
 
 @app.command()
@@ -268,6 +534,8 @@ def run_agent(
     console.print(result["summary"])
     if result["tokens_in"] or result["tokens_out"]:
         console.print(f"tokens: {result['tokens_in']} entrada · {result['tokens_out']} saída")
+    if result.get("cost_brl"):
+        console.print(f"custo estimado: US$ {result['cost_usd']:.4f} · R$ {result['cost_brl']:.2f}")
     if result["status"] != "ended":
         raise typer.Exit(1)
 

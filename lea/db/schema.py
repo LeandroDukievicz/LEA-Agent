@@ -233,8 +233,8 @@ _INITIAL: tuple[str, ...] = (
     """,
     "CREATE INDEX idx_cron_runs_job ON cron_runs(job_id, started_at DESC)",
     # ── Canais ───────────────────────────────────────────────────────────
-    # Sem segredo aqui: token de bot vai para o keyring do sistema, e
-    # config_json guarda só o que não é sensível (ids de canal, allowlist).
+    # Segredos ficam fora do banco (variáveis de ambiente); config_json guarda
+    # apenas ids de canal, allowlists e opções de execução.
     """
     CREATE TABLE channels (
         id           INTEGER PRIMARY KEY,
@@ -292,7 +292,59 @@ _AGENT_APPROVALS: tuple[str, ...] = (
     "CREATE INDEX idx_agent_approvals_session ON agent_approvals(session_id, requested_at DESC)",
 )
 
-MIGRATIONS: tuple[tuple[str, ...], ...] = (_INITIAL, _CLI_AGENT_BACKENDS, _AGENT_APPROVALS)
+_SKILL_PROPOSALS: tuple[str, ...] = (
+    """
+    CREATE TABLE skill_proposals (
+        id               INTEGER PRIMARY KEY,
+        skill_id         INTEGER NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+        session_id       TEXT REFERENCES sessions(id) ON DELETE SET NULL,
+        base_version     TEXT NOT NULL,
+        base_sha256      TEXT NOT NULL,
+        proposed_version TEXT NOT NULL,
+        content          TEXT NOT NULL,
+        diff             TEXT NOT NULL DEFAULT '',
+        reason           TEXT NOT NULL,
+        created_by       TEXT NOT NULL,
+        status           TEXT NOT NULL DEFAULT 'pending'
+                         CHECK (status IN ('pending', 'applying', 'applied', 'rejected', 'conflict')),
+        created_at       TEXT NOT NULL,
+        reviewed_at      TEXT
+    )
+    """,
+    "CREATE INDEX idx_skill_proposals_status_at ON skill_proposals(status, created_at DESC)",
+    "CREATE INDEX idx_skill_proposals_skill ON skill_proposals(skill_id, created_at DESC)",
+)
+
+_CHANNEL_INBOX: tuple[str, ...] = (
+    """
+    CREATE TABLE channel_inbox (
+        id         INTEGER PRIMARY KEY,
+        platform   TEXT NOT NULL CHECK (platform IN ('telegram', 'discord')),
+        message_key TEXT NOT NULL,
+        remote_id  TEXT NOT NULL,
+        user_id    TEXT NOT NULL,
+        project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+        backend    TEXT,
+        content    TEXT NOT NULL,
+        status     TEXT NOT NULL DEFAULT 'queued'
+                   CHECK (status IN ('queued', 'running', 'completed', 'failed')),
+        session_id TEXT REFERENCES sessions(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL,
+        finished_at TEXT,
+        UNIQUE (platform, message_key)
+    )
+    """,
+    "CREATE INDEX idx_channel_inbox_status ON channel_inbox(status, created_at)",
+    "CREATE INDEX idx_channel_inbox_session ON channel_inbox(session_id)",
+)
+
+MIGRATIONS: tuple[tuple[str, ...], ...] = (
+    _INITIAL,
+    _CLI_AGENT_BACKENDS,
+    _AGENT_APPROVALS,
+    _SKILL_PROPOSALS,
+    _CHANNEL_INBOX,
+)
 
 #: Versão alvo do esquema.
 LATEST_VERSION = len(MIGRATIONS)

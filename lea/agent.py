@@ -18,7 +18,7 @@ from typing import Any
 
 import aiosqlite
 
-from lea import events, skills
+from lea import costs as cost_tracker, events, skills
 from lea.config import Config
 from lea.llm import split_model
 from lea.memory import Memory
@@ -85,6 +85,27 @@ AGENT_TOOLS = [
         },
     },
 ]
+SKILL_UPDATE_TOOL = {
+    "name": "propose_skill_update",
+    "description": (
+        "Propõe uma melhoria para a skill selecionada. O LEA valida e aplica automaticamente "
+        "ou aguarda revisão humana conforme a configuração."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "content": {
+                "type": "string",
+                "description": "Conteúdo completo atualizado de SKILL.md.",
+            },
+            "reason": {
+                "type": "string",
+                "description": "O que a execução ensinou e por que a skill deve mudar.",
+            },
+        },
+        "required": ["content", "reason"],
+    },
+}
 
 
 class AgentError(RuntimeError):
@@ -137,7 +158,8 @@ class AgentService:
                 raise AgentError(f"backend {backend} requer '{binary}' instalado e disponível no PATH")
 
         async with self.conn.execute(
-            "SELECT id, slug, path, allow_autonomous, max_duration_min, require_approval_for "
+            "SELECT id, slug, path, allow_autonomous, max_duration_min, "
+            "budget_brl_per_session, require_approval_for "
             "FROM projects WHERE id = ?",
             (project_id,),
         ) as cursor:
@@ -146,6 +168,24 @@ class AgentService:
             raise AgentError(f"projeto desconhecido: {project_id}")
         if not bool(project["allow_autonomous"]):
             raise AgentError("habilite allow_autonomous no projeto antes de iniciar o lea-agent")
+        if backend == "anthropic-api":
+            _, model = split_model(self.config.agent.default_model)
+            if cost_tracker.pricing_for_model(model, self.config.costs) is None:
+                raise AgentError(
+                    f"não há preço configurado para {model!r}; configure "
+                    "costs.model_prices_usd_per_million"
+                )
+            if (
+                project["budget_brl_per_session"] is not None
+                and float(project["budget_brl_per_session"]) <= 0
+            ):
+                raise AgentError("o orçamento por sessão do projeto é zero")
+            spent_today = await cost_tracker.daily_total_brl(self.conn)
+            if spent_today >= self.config.costs.daily_budget_brl:
+                raise AgentError(
+                    f"orçamento diário atingido: R$ {spent_today:.2f} de "
+                    f"R$ {self.config.costs.daily_budget_brl:.2f}"
+                )
         max_queued = self.config.agent.max_parallel_tasks * 4
         if self.queued_or_running >= max_queued:
             raise AgentError("limite de tarefas autônomas ativas ou na fila atingido")
@@ -189,6 +229,11 @@ class AgentService:
                 backend=backend,
                 approval_patterns=self._approval_patterns(project["require_approval_for"]),
                 duration_minutes=int(project["max_duration_min"] or self.config.agent.max_duration_min),
+                session_budget_brl=(
+                    float(project["budget_brl_per_session"])
+                    if project["budget_brl_per_session"] is not None
+                    else None
+                ),
             ),
             name=f"lea-agent:{session_id}",
         )
@@ -271,6 +316,7 @@ class AgentService:
         backend: str,
         approval_patterns: list[str],
         duration_minutes: int,
+        session_budget_brl: float | None,
     ) -> dict[str, Any]:
         if backend != "anthropic-api":
             return await self._run_cli(
@@ -287,6 +333,7 @@ class AgentService:
 
         started = time.monotonic()
         tokens_in = tokens_out = 0
+        cost_usd = session_cost_brl = 0.0
         success = False
         summary = ""
         client = None
@@ -296,6 +343,16 @@ class AgentService:
             provider, model = split_model(self.config.agent.default_model)
             if provider != "anthropic":
                 raise AgentError(f"provedor não suportado pelo lea-agent: {provider}")
+            if cost_tracker.pricing_for_model(model, self.config.costs) is None:
+                raise AgentError(f"não há preço configurado para {model!r}")
+            spent_today = await cost_tracker.daily_total_brl(self.conn)
+            if spent_today >= self.config.costs.daily_budget_brl:
+                raise AgentError(
+                    f"orçamento diário atingido: R$ {spent_today:.2f} de "
+                    f"R$ {self.config.costs.daily_budget_brl:.2f}"
+                )
+            if session_budget_brl is not None and session_budget_brl <= 0:
+                raise AgentError("o orçamento por sessão do projeto é zero")
             client = anthropic.AsyncAnthropic()
             selection = await self.memory.context_for(
                 project_id=project_id,
@@ -317,12 +374,48 @@ class AgentService:
                         model=model,
                         max_tokens=min(4096, max_tokens - tokens_in - tokens_out),
                         system=system,
-                        tools=AGENT_TOOLS,
+                        tools=AGENT_TOOLS + ([SKILL_UPDATE_TOOL] if skill is not None else []),
                         messages=messages,
                     )
                     usage = getattr(response, "usage", None)
-                    tokens_in += int(getattr(usage, "input_tokens", 0) or 0)
-                    tokens_out += int(getattr(usage, "output_tokens", 0) or 0)
+                    response_model = str(getattr(response, "model", None) or model)
+                    usage_cost = cost_tracker.anthropic_usage_cost_usd(
+                        response_model,
+                        usage,
+                        self.config.costs,
+                    )
+                    if usage_cost is None:
+                        raise AgentError(
+                            "não há preço configurado para o modelo retornado "
+                            f"{response_model!r}"
+                        )
+                    call_tokens_in, call_tokens_out, call_cost_usd = usage_cost
+                    tokens_in += call_tokens_in
+                    tokens_out += call_tokens_out
+                    call_cost_brl = await cost_tracker.record_call(
+                        self.conn,
+                        session_id=session_id,
+                        model=response_model,
+                        tokens_in=call_tokens_in,
+                        tokens_out=call_tokens_out,
+                        cost_usd=call_cost_usd,
+                        usd_brl=self.config.costs.usd_brl,
+                        at=_now(),
+                    )
+                    cost_usd += call_cost_usd
+                    session_cost_brl += call_cost_brl
+                    spent_today = await cost_tracker.daily_total_brl(self.conn)
+                    if session_budget_brl is not None and session_cost_brl >= session_budget_brl:
+                        tool_error = f"orçamento por sessão atingido (R$ {session_cost_brl:.2f})."
+                        summary = tool_error
+                        break
+                    if spent_today >= self.config.costs.daily_budget_brl:
+                        tool_error = (
+                            f"orçamento diário atingido (R$ {spent_today:.2f} de "
+                            f"R$ {self.config.costs.daily_budget_brl:.2f})."
+                        )
+                        summary = tool_error
+                        break
                     assistant_content = response.content
                     messages.append({"role": "assistant", "content": assistant_content})
 
@@ -379,6 +472,8 @@ class AgentService:
                                             arguments,
                                             root=root,
                                             approval_patterns=approval_patterns,
+                                            session_id=session_id,
+                                            skill=skill,
                                             approval_granted=True,
                                         )
                                         is_error = result.startswith("Blocked:")
@@ -388,6 +483,8 @@ class AgentService:
                                         arguments,
                                         root=root,
                                         approval_patterns=approval_patterns,
+                                        session_id=session_id,
+                                        skill=skill,
                                     )
                                     is_error = result.startswith("Blocked:")
                                     if is_error:
@@ -461,6 +558,8 @@ class AgentService:
             "summary": summary,
             "tokens_in": tokens_in,
             "tokens_out": tokens_out,
+            "cost_usd": cost_usd,
+            "cost_brl": session_cost_brl,
             "error": tool_error,
             "backend": backend,
         }
@@ -616,6 +715,8 @@ class AgentService:
         *,
         root: Path,
         approval_patterns: list[str],
+        session_id: str,
+        skill: skills.SkillDocument | None,
         approval_granted: bool = False,
     ) -> str:
         if name == "list_files":
@@ -704,6 +805,34 @@ class AgentService:
             decoded = output.decode("utf-8", "replace")
             suffix = "\n… (output truncated)" if truncated else ""
             return f"exit_code={process.returncode}\n{decoded}{suffix}"
+
+        if name == "propose_skill_update":
+            if skill is None:
+                return "Error: uma skill precisa estar selecionada para propor uma atualização."
+            content = arguments.get("content")
+            reason = arguments.get("reason")
+            if not isinstance(content, str) or not isinstance(reason, str):
+                return "Error: content e reason precisam ser textos."
+            proposal = await skills.propose_update(
+                self.conn,
+                skill.id,
+                content,
+                reason=reason,
+                created_by=session_id,
+                session_id=session_id,
+                auto_apply=self.config.agent.auto_apply_skill_updates,
+            )
+            if proposal["status"] == "applied":
+                updated = proposal["skill"]
+                return (
+                    f"Skill {updated['name']} atualizada para v{updated['version']} "
+                    "automaticamente."
+                )
+            return (
+                f"Proposta #{proposal['id']} criada para {proposal['skill_name']} "
+                f"(v{proposal['base_version']} → v{proposal['proposed_version']}); "
+                "aguarda revisão humana."
+            )
 
         return f"Error: ferramenta desconhecida: {name}"
 
@@ -807,10 +936,23 @@ class AgentService:
             (status, ended, tokens_in, tokens_out, session_id),
         )
         await self.conn.commit()
+        async with self.conn.execute(
+            "SELECT cost_brl FROM sessions WHERE id = ?",
+            (session_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+        cost_brl = float(row["cost_brl"]) if row is not None else 0.0
         await self._event(
             session_id,
             "session_end",
-            {"status": status, "summary": summary, "tokens_in": tokens_in, "tokens_out": tokens_out, "duration_ms": duration},
+            {
+                "status": status,
+                "summary": summary,
+                "tokens_in": tokens_in,
+                "tokens_out": tokens_out,
+                "cost_brl": round(cost_brl, 2),
+                "duration_ms": duration,
+            },
         )
 
 
@@ -896,6 +1038,11 @@ def _system_prompt(project_slug: str, selection: Any, skill: skills.SkillDocumen
         if len(skill.body) > len(body):
             body += "\n[restante da skill omitido pelo limite de contexto]"
         parts.append(
+            "Se esta execução revelar uma melhoria reutilizável para a skill selecionada, "
+            "use propose_skill_update com o documento completo e explique a evidência. "
+            "Não diga que a skill mudou se a ferramenta retornar uma proposta pendente."
+        )
+        parts.append(
             f"Skill selecionada {skill.name} v{skill.version}. Siga as instruções abaixo dentro do escopo da tarefa.\n"
             f"<skill name={skill.name!r}>\n{body}\n</skill>"
         )
@@ -938,6 +1085,11 @@ def _safe_tool_input(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         return {"path": arguments.get("path"), "bytes": len(str(arguments.get("content") or "").encode("utf-8"))}
     if name == "run_command":
         return {"argv": arguments.get("argv"), "cwd": arguments.get("cwd")}
+    if name == "propose_skill_update":
+        return {
+            "bytes": len(str(arguments.get("content") or "").encode("utf-8")),
+            "reason": arguments.get("reason"),
+        }
     return {key: value for key, value in arguments.items() if key in {"path", "directory"}}
 
 

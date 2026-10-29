@@ -11,7 +11,7 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +19,7 @@ import aiosqlite
 import yaml
 
 from lea import paths
+from lea.security import injection
 
 _FRONTMATTER = re.compile(r"\A---\s*\n(.*?)\n---\s*\n?(.*)\Z", re.DOTALL)
 _NAME = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
@@ -27,6 +28,10 @@ MAX_SKILL_BYTES = 500_000
 
 class SkillError(ValueError):
     """Documento de skill inválido ou não encontrado."""
+
+
+class SkillConflictError(SkillError):
+    """A proposta usa uma versão base que já foi alterada."""
 
 
 @dataclass(frozen=True)
@@ -205,15 +210,12 @@ async def save_skill(
     version = skill.version
     if current is not None:
         async with conn.execute(
-            "SELECT 1 FROM skill_versions WHERE skill_id = ? AND version = ? LIMIT 1",
-            (int(current["id"]), version),
+            "SELECT version FROM skill_versions WHERE skill_id = ?",
+            (int(current["id"]),),
         ) as cursor:
-            version_exists = await cursor.fetchone() is not None
-        if version == current["version"] or version_exists:
-            try:
-                version = str(int(current["version"]) + 1)
-            except ValueError:
-                version = f"{current['version']}+{hashlib.sha256(content.encode()).hexdigest()[:8]}"
+            used_versions = {str(row["version"]) for row in await cursor.fetchall()}
+        if version == current["version"] or version in used_versions:
+            version = _next_version(current["version"], content, used_versions)
         content = _write_version(content, version)
         skill = parse(content)
 
@@ -293,6 +295,235 @@ async def runs(conn: aiosqlite.Connection, skill_id: int, limit: int = 50) -> li
     ) as cursor:
         rows = await cursor.fetchall()
     return [dict(row) for row in rows]
+
+
+async def propose_update(
+    conn: aiosqlite.Connection,
+    skill_id: int,
+    content: str,
+    *,
+    reason: str,
+    created_by: str,
+    session_id: str,
+    auto_apply: bool = False,
+) -> dict[str, Any]:
+    """Aplica ou registra para revisão uma atualização feita pelo agente."""
+    if len(content.encode("utf-8")) > MAX_SKILL_BYTES:
+        raise SkillError(f"SKILL.md excede o limite de {MAX_SKILL_BYTES} bytes")
+    reason = reason.strip()
+    if not reason or len(reason) > 2000:
+        raise SkillError("reason precisa ter entre 1 e 2000 caracteres")
+    async with conn.execute(
+        "SELECT id, name, version, origin FROM skills WHERE id = ?",
+        (skill_id,),
+    ) as cursor:
+        current = await cursor.fetchone()
+    if current is None:
+        raise SkillError(f"skill desconhecida: {skill_id}")
+
+    current_skill = await get_skill(conn, current["name"])
+    if current_skill.content == content:
+        raise SkillError("a proposta não altera o conteúdo atual da skill")
+    parse(content, directory_name=current_skill.name)
+    async with conn.execute(
+        "SELECT version FROM skill_versions WHERE skill_id = ?",
+        (skill_id,),
+    ) as cursor:
+        used_versions = {str(row["version"]) for row in await cursor.fetchall()}
+    proposed_version = _next_version(current_skill.version, content, used_versions)
+    proposed_content = _write_version(content, proposed_version)
+    parse(proposed_content, directory_name=current_skill.name)
+    finding = injection.first_problem(proposed_content, injection.Scope.STRICT)
+    if finding:
+        raise SkillError(f"a proposta contém uma instrução suspeita e foi bloqueada: {finding}")
+
+    if auto_apply:
+        updated = await save_skill(
+            conn,
+            proposed_content,
+            origin=current["origin"],
+            reason=reason,
+            created_by=created_by,
+        )
+        return {"status": "applied", "skill": updated.as_dict(include_body=True)}
+
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    cursor = await conn.execute(
+        "INSERT INTO skill_proposals "
+        "(skill_id, session_id, base_version, base_sha256, proposed_version, content, diff, reason, created_by, status, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)",
+        (
+            skill_id,
+            session_id,
+            current_skill.version,
+            hashlib.sha256(current_skill.content.encode()).hexdigest(),
+            proposed_version,
+            proposed_content,
+            _unified_diff(current_skill.content, proposed_content),
+            reason,
+            created_by,
+            now,
+        ),
+    )
+    await conn.commit()
+    return {
+        "id": int(cursor.lastrowid or 0),
+        "skill_id": skill_id,
+        "skill_name": current_skill.name,
+        "base_version": current_skill.version,
+        "proposed_version": proposed_version,
+        "status": "pending",
+    }
+
+
+async def list_proposals(
+    conn: aiosqlite.Connection,
+    status: str | None = "pending",
+    limit: int = 100,
+) -> list[dict[str, Any]]:
+    await recover_applying_proposals(conn)
+    query = (
+        "SELECT p.id, p.skill_id, s.name AS skill_name, p.session_id, p.base_version, "
+        "p.proposed_version, p.reason, p.created_by, p.status, p.created_at, "
+        "p.reviewed_at, s.version AS current_version "
+        "FROM skill_proposals p JOIN skills s ON s.id = p.skill_id"
+    )
+    params: tuple[Any, ...] = ()
+    if status is not None:
+        query += " WHERE p.status = ?"
+        params = (status,)
+    query += " ORDER BY p.created_at DESC, p.id DESC LIMIT ?"
+    params += (limit,)
+    async with conn.execute(query, params) as cursor:
+        rows = await cursor.fetchall()
+    return [dict(row) for row in rows]
+
+
+async def get_proposal(conn: aiosqlite.Connection, proposal_id: int) -> dict[str, Any] | None:
+    async with conn.execute(
+        "SELECT p.*, s.name AS skill_name, s.version AS current_version "
+        "FROM skill_proposals p JOIN skills s ON s.id = p.skill_id WHERE p.id = ?",
+        (proposal_id,),
+    ) as cursor:
+        row = await cursor.fetchone()
+    return dict(row) if row is not None else None
+
+
+async def apply_proposal(conn: aiosqlite.Connection, proposal_id: int) -> SkillDocument:
+    """Aplica uma proposta pendente se a skill ainda estiver na versão-base."""
+    await recover_applying_proposals(conn)
+    cursor = await conn.execute(
+        "UPDATE skill_proposals SET status = 'applying', reviewed_at = ? "
+        "WHERE id = ? AND status = 'pending'",
+        (_now(), proposal_id),
+    )
+    await conn.commit()
+    if cursor.rowcount != 1:
+        raise SkillError(f"proposta pendente não encontrada: {proposal_id}")
+
+    saved = False
+    try:
+        proposal = await get_proposal(conn, proposal_id)
+        if proposal is None:
+            raise SkillError(f"proposta desconhecida: {proposal_id}")
+        current = await get_skill(conn, proposal["skill_name"])
+        current_hash = hashlib.sha256(current.content.encode()).hexdigest()
+        if current.version != proposal["base_version"] or current_hash != proposal["base_sha256"]:
+            await conn.execute(
+                "UPDATE skill_proposals SET status = 'conflict', reviewed_at = ? "
+                "WHERE id = ? AND status = 'applying'",
+                (_now(), proposal_id),
+            )
+            await conn.commit()
+            raise SkillConflictError(
+                f"a skill mudou de {proposal['base_version']} para {current.version}; gere uma nova proposta"
+            )
+        parse(proposal["content"], directory_name=current.name)
+        finding = injection.first_problem(proposal["content"], injection.Scope.STRICT)
+        if finding:
+            raise SkillError(f"a proposta contém uma instrução suspeita e foi bloqueada: {finding}")
+        updated = await save_skill(
+            conn,
+            proposal["content"],
+            origin=current.origin,
+            reason=proposal["reason"],
+            created_by=proposal["created_by"],
+        )
+        saved = True
+        await conn.execute(
+            "UPDATE skill_proposals SET status = 'applied', reviewed_at = ? "
+            "WHERE id = ? AND status = 'applying'",
+            (_now(), proposal_id),
+        )
+        await conn.commit()
+        return updated
+    except SkillConflictError:
+        raise
+    except Exception:
+        if saved:
+            await conn.execute(
+                "UPDATE skill_proposals SET status = 'applied', reviewed_at = ? "
+                "WHERE id = ? AND status = 'applying'",
+                (_now(), proposal_id),
+            )
+        else:
+            await conn.execute(
+                "UPDATE skill_proposals SET status = 'pending', reviewed_at = NULL "
+                "WHERE id = ? AND status = 'applying'",
+                (proposal_id,),
+            )
+        await conn.commit()
+        raise
+
+
+async def reject_proposal(conn: aiosqlite.Connection, proposal_id: int) -> bool:
+    cursor = await conn.execute(
+        "UPDATE skill_proposals SET status = 'rejected', reviewed_at = ? "
+        "WHERE id = ? AND status = 'pending'",
+        (_now(), proposal_id),
+    )
+    await conn.commit()
+    return cursor.rowcount == 1
+
+
+async def recover_applying_proposals(conn: aiosqlite.Connection) -> None:
+    """Reconcilia uma aplicação interrompida entre o arquivo e o registro."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat(timespec="seconds")
+    async with conn.execute(
+        "SELECT p.id, p.skill_id, p.base_version, p.base_sha256, p.proposed_version, "
+        "p.content, p.reviewed_at, s.name FROM skill_proposals p "
+        "JOIN skills s ON s.id = p.skill_id WHERE p.status = 'applying'"
+    ) as cursor:
+        proposals = await cursor.fetchall()
+    for proposal in proposals:
+        try:
+            current = await get_skill(conn, proposal["name"])
+        except SkillError:
+            await conn.execute(
+                "UPDATE skill_proposals SET status = 'conflict', reviewed_at = ? "
+                "WHERE id = ? AND status = 'applying'",
+                (_now(), proposal["id"]),
+            )
+            continue
+        current_hash = hashlib.sha256(current.content.encode()).hexdigest()
+        proposal_hash = hashlib.sha256(proposal["content"].encode()).hexdigest()
+        if current.version == proposal["proposed_version"] and current_hash == proposal_hash:
+            status = "applied"
+            reviewed_at = proposal["reviewed_at"] or _now()
+        elif current.version != proposal["base_version"] or current_hash != proposal["base_sha256"]:
+            status = "conflict"
+            reviewed_at = _now()
+        elif not proposal["reviewed_at"] or proposal["reviewed_at"] < cutoff:
+            status = "pending"
+            reviewed_at = None
+        else:
+            continue
+        await conn.execute(
+            "UPDATE skill_proposals SET status = ?, reviewed_at = ? "
+            "WHERE id = ? AND status = 'applying'",
+            (status, reviewed_at, proposal["id"]),
+        )
+    await conn.commit()
 
 
 async def sync_from_disk(conn: aiosqlite.Connection) -> dict[str, Any]:
@@ -375,3 +606,21 @@ def _json_list(raw: str) -> list[str]:
     except (TypeError, json.JSONDecodeError):
         return []
     return [item for item in value if isinstance(item, str)] if isinstance(value, list) else []
+
+
+def _next_version(current: str, content: str, used_versions: set[str]) -> str:
+    if current.isdigit():
+        numbers = [int(version) for version in used_versions if version.isdigit()]
+        return str(max([int(current), *numbers]) + 1)
+    base = f"{current[:25]}+{hashlib.sha256(content.encode()).hexdigest()[:8]}"
+    candidate = base
+    suffix = 2
+    while candidate in used_versions:
+        marker = f"-{suffix}"
+        candidate = f"{base[:40 - len(marker)]}{marker}"
+        suffix += 1
+    return candidate
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")

@@ -116,7 +116,14 @@ POST  /api/agent/runs                    inicia tarefa em modo autônomo
 POST  /api/agent/runs/{id}/stop          interrompe a tarefa
 GET   /api/agent/approvals               lista ações aguardando aprovação
 POST  /api/agent/approvals/{id}/decision aprova ou recusa uma ação
+GET   /api/channels                      lista bots e rotas configuradas
+POST  /api/channels/routes               cria ou atualiza rota autorizada
+DELETE /api/channels/routes              remove rota autorizada
 GET   /api/skills                        lista skills indexadas
+GET   /api/skills/proposals              lista propostas pendentes de skills
+GET   /api/skills/proposals/{id}         exibe conteúdo e diff de uma proposta
+POST  /api/skills/proposals/{id}/apply  aplica uma proposta revisada
+POST  /api/skills/proposals/{id}/reject recusa uma proposta
 POST  /api/skills                        cria SKILL.md
 GET   /api/skills/{name}                 lê skill
 PUT   /api/skills/{name}                 grava nova versão
@@ -127,6 +134,7 @@ POST  /api/automations                   cria cron
 PATCH /api/automations/{id}              edita ou pausa cron
 GET   /api/automations/{id}/runs         histórico de execução
 PATCH /api/projects/{id}/autonomy        opt-in e limites do projeto
+GET   /api/costs                        histórico de consumo estimado da API
 ```
 
 `lea-agent` só inicia em projeto com `allow_autonomous = 1`. O backend padrão é
@@ -155,17 +163,36 @@ Comandos permitidos e os CLIs locais rodam sob o usuário local; habilite
 autonomia apenas em projetos em que confia. O LEA impõe limite de duração a
 todos os backends; os limites de tokens são aplicados pelo modo API.
 
+O backend `anthropic-api` registra custo por chamada usando as taxas por modelo
+configuradas em `costs.model_prices_usd_per_million`, converte para reais com
+`costs.usd_brl` e para ao atingir os orçamentos diário ou por sessão. O endpoint
+`GET /api/costs` e `lea costs` consultam o histórico. Os CLIs registram tokens,
+mas o LEA não estima o preço cobrado pelos planos do Codex ou Claude Code.
+
+Os canais Telegram e Discord iniciam tarefas do `lea-agent`. Cada rota aponta
+para um projeto com autonomia habilitada e exige uma allowlist de usuários.
+Telegram usa long polling; Discord usa `discord.py` como dependência opcional e
+exige `Message Content Intent` habilitado no portal. Os tokens vêm de
+`LEA_TELEGRAM_BOT_TOKEN` e `LEA_DISCORD_BOT_TOKEN`; nenhum segredo é salvo no
+SQLite. Mensagens privadas podem usar a rota `*`; em grupos, Telegram exige
+`/lea` e Discord exige menção ao bot ou `!lea`. Solicitações de aprovação do
+backend API voltam ao chat de origem e aceitam os comandos de aprovar/recusar.
+
 Skills ficam em `~/.lea/skills/<nome>/SKILL.md`; ao iniciar, o daemon importa
 novos arquivos e indexa edições. O Markdown guarda o conteúdo e o SQLite guarda
-versões e execuções. O scanner estrito impede injetar uma skill marcada. O cron aceita
-cinco campos numéricos e fuso IANA; o daemon
-calcula a próxima execução em UTC, faz claim antes de disparar e marca execuções
+versões e execuções. Quando uma tarefa `anthropic-api` usa uma skill, o agente
+pode sugerir uma atualização. Por padrão, ela fica como proposta no SQLite e
+exige revisão com `lea skills proposals show|apply|reject`; a opção
+`agent.auto_apply_skill_updates` permite aplicar direto. O scanner estrito
+bloqueia propostas marcadas, e uma proposta baseada numa versão antiga entra em
+conflito. O cron aceita cinco campos numéricos e fuso IANA; o daemon calcula a
+próxima execução em UTC, faz claim antes de disparar e marca execuções
 inacabadas como interrompidas após reiniciar. O backend fica salvo com cada
 automação; as anteriores à migração passam a usar Codex.
 
-Esta é a base da Fase 5. O fluxo de aprovação está ligado ao backend API;
-prompts nativos de aprovação dos CLIs, revisão automática de skills, custo
-monetário e canais ainda não estão ligados ao agente próprio.
+O fluxo de aprovação está ligado ao backend API; propostas de atualização de
+skills, custo de `anthropic-api` e canais Telegram/Discord também estão ligados.
+Prompts nativos de aprovação dos CLIs ainda não estão ligados ao agente próprio.
 
 ## Invariantes que o código assume
 

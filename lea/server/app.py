@@ -26,9 +26,10 @@ from datetime import datetime, timezone
 from typing import Annotated, Any
 
 import aiosqlite
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 
 from lea import __version__, events, paths, status
+from lea import channels
 from lea.config import Config, load
 from lea.db import session as db
 from lea.memory import Memory
@@ -118,7 +119,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.launcher = Launcher(app.state.db, memory, events.bus)
     app.state.agent = AgentService(app.state.db, memory, config, events.bus)
     app.state.cron = CronScheduler(app.state.db, app.state.agent, events.bus)
+    app.state.channels = channels.ChannelManager(app.state.db, app.state.agent, events.bus)
     await app.state.cron.start()
+    await app.state.channels.start()
 
     status.prime()
 
@@ -133,6 +136,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        await app.state.channels.shutdown()
         await app.state.cron.shutdown()
         await app.state.agent.shutdown()
         # Ordem importa: as sessões param (e suas tasks de PTY morrem) antes
@@ -218,6 +222,32 @@ async def overview(
             "exposed": config.server.is_exposed,
         },
         "ui": config.ui.model_dump(),
+    }
+
+
+@app.get("/api/costs", dependencies=[Depends(require_ui_token)])
+async def cost_report(
+    conn: Annotated[aiosqlite.Connection, Depends(get_db)],
+    config: Annotated[Config, Depends(get_config)],
+    days: Annotated[int, Query(ge=1, le=365)] = 30,
+) -> dict[str, Any]:
+    async with conn.execute(
+        "SELECT date(at, 'localtime') AS day, harness, model, "
+        "SUM(tokens_in) AS tokens_in, SUM(tokens_out) AS tokens_out, "
+        "SUM(cost_usd) AS cost_usd, SUM(cost_brl) AS cost_brl, COUNT(*) AS calls "
+        "FROM costs WHERE date(at, 'localtime') >= date('now', 'localtime', ?) "
+        "GROUP BY day, harness, model ORDER BY day DESC, harness, model",
+        (f"-{days - 1} days",),
+    ) as cursor:
+        rows = await cursor.fetchall()
+    items = [dict(row) for row in rows]
+    return {
+        "days": days,
+        "daily_budget_brl": config.costs.daily_budget_brl,
+        "usd_brl": config.costs.usd_brl,
+        "total_usd": sum(float(row["cost_usd"] or 0) for row in items),
+        "total_brl": sum(float(row["cost_brl"] or 0) for row in items),
+        "entries": items,
     }
 
 

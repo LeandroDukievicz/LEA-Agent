@@ -278,6 +278,7 @@ async def listing(conn: aiosqlite.Connection) -> list[dict[str, Any]]:
             "default_branch": row["default_branch"],
             "language": row["language"],
             "allow_autonomous": bool(row["allow_autonomous"]),
+            "budget_brl_per_session": row["budget_brl_per_session"],
             "max_duration_min": row["max_duration_min"],
             "require_approval_for": json.loads(row["require_approval_for"] or "[]"),
             "active_sessions": row["active_sessions"],

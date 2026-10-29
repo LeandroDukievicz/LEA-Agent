@@ -8,7 +8,7 @@ from typing import Annotated, Any
 import aiosqlite
 from fastapi import APIRouter, Body, HTTPException, Query, Request
 
-from lea import cron, skills
+from lea import channels, cron, skills
 from lea.agent import AgentError, AgentService, normalize_backend
 
 router = APIRouter(prefix="/api", tags=["agent"])
@@ -75,6 +75,54 @@ async def decide_agent_approval(
     }
 
 
+# ── canais ───────────────────────────────────────────────────────────────
+
+
+@router.get("/channels")
+async def list_channels(request: Request) -> dict[str, Any]:
+    return {"channels": await channels.list_channels(_db(request))}
+
+
+@router.post("/channels/routes", status_code=201)
+async def add_channel_route(
+    request: Request,
+    payload: Annotated[dict[str, Any], Body()],
+) -> dict[str, Any]:
+    users = payload.get("allowed_user_ids")
+    if not isinstance(users, list) or any(not isinstance(user, (str, int)) for user in users):
+        raise HTTPException(status_code=422, detail="allowed_user_ids precisa ser uma lista de ids")
+    try:
+        route = await channels.configure_route(
+            _db(request),
+            platform=str(payload.get("platform") or ""),
+            remote_id=str(payload.get("remote_id") or ""),
+            project_id=int(payload.get("project_id")),
+            allowed_user_ids=[str(user) for user in users],
+            backend=payload.get("backend"),
+        )
+    except (channels.ChannelError, TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"route": route, "restart_required": True}
+
+
+@router.delete("/channels/routes")
+async def delete_channel_route(
+    request: Request,
+    payload: Annotated[dict[str, Any], Body()],
+) -> dict[str, Any]:
+    try:
+        removed = await channels.remove_route(
+            _db(request),
+            platform=str(payload.get("platform") or ""),
+            remote_id=str(payload.get("remote_id") or ""),
+        )
+    except channels.ChannelError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not removed:
+        raise HTTPException(status_code=404, detail="rota não encontrada")
+    return {"removed": True, "restart_required": True}
+
+
 # ── skills ───────────────────────────────────────────────────────────────
 
 
@@ -82,6 +130,47 @@ async def decide_agent_approval(
 async def list_skills(request: Request) -> dict[str, Any]:
     items = await skills.list_skills(_db(request))
     return {"skills": [item.as_dict() for item in items]}
+
+
+@router.get("/skills/proposals")
+async def list_skill_proposals(
+    request: Request,
+    status: Annotated[
+        str | None,
+        Query(pattern="^(pending|applying|applied|rejected|conflict)$"),
+    ] = "pending",
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> dict[str, Any]:
+    return {"proposals": await skills.list_proposals(_db(request), status, limit)}
+
+
+@router.get("/skills/proposals/{proposal_id}")
+async def get_skill_proposal(request: Request, proposal_id: int) -> dict[str, Any]:
+    proposal = await skills.get_proposal(_db(request), proposal_id)
+    if proposal is None:
+        raise HTTPException(status_code=404, detail=f"proposta desconhecida: {proposal_id}")
+    return proposal
+
+
+@router.post("/skills/proposals/{proposal_id}/apply")
+async def apply_skill_proposal(request: Request, proposal_id: int) -> dict[str, Any]:
+    try:
+        updated = await skills.apply_proposal(_db(request), proposal_id)
+    except skills.SkillConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except skills.SkillError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"status": "applied", "skill": updated.as_dict(include_body=True)}
+
+
+@router.post("/skills/proposals/{proposal_id}/reject")
+async def reject_skill_proposal(request: Request, proposal_id: int) -> dict[str, Any]:
+    proposal = await skills.get_proposal(_db(request), proposal_id)
+    if proposal is None:
+        raise HTTPException(status_code=404, detail=f"proposta desconhecida: {proposal_id}")
+    if not await skills.reject_proposal(_db(request), proposal_id):
+        raise HTTPException(status_code=409, detail="proposta não está mais pendente")
+    return {"id": proposal_id, "status": "rejected"}
 
 
 @router.get("/skills/{name}")
