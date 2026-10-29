@@ -157,13 +157,15 @@ uv run lea run --project 1 --backend anthropic-api --task "resuma o projeto"
 Todos os backends recebem contexto da wiki e, opcionalmente, uma skill. O modo
 `anthropic-api` usa as ferramentas do LEA, limita caminhos ao projeto e bloqueia
 comandos configurados para revisão. O Codex roda com sandbox `workspace-write`
-e revisão automática de permissões; o Claude Code roda em modo `auto`, e uma
-permissão que exigiria interação é negada. Os CLIs usam seus próprios controles
-locais; `require_approval_for` também é incluído nas instruções e não substitui
-esses controles. O LEA impõe limite de duração aos três backends. Limites de
-tokens do agente e métricas de custo continuam disponíveis apenas no modo API e
-em fases posteriores; para o consumo dos CLIs, consulte o próprio Codex ou
-Claude Code. Habilite autonomia somente em projetos nos quais você confia.
+e revisão automática de permissões. Os padrões de `require_approval_for` viram
+regras temporárias de bloqueio no Codex e negações nativas de comandos Bash no
+Claude Code. O modo `auto` do Claude não abre prompts de permissão; comandos
+protegidos são recusados durante a tarefa, não colocados numa fila de aprovação
+humana. O LEA impõe limite de duração aos três
+backends. Limites de tokens do agente e métricas de custo continuam disponíveis
+apenas no modo API e em fases posteriores; para o consumo dos CLIs, consulte o
+próprio Codex ou Claude Code. Habilite autonomia somente em projetos nos quais
+você confia.
 
 Uma automação cron guarda seu `backend`. Se omitido, usa `agent.default_backend`;
 automações existentes passam a usar Codex após a migração.

@@ -10,6 +10,7 @@ import secrets
 import shlex
 import shutil
 import signal
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -435,6 +436,7 @@ class AgentService:
     ) -> dict[str, Any]:
         started = time.monotonic()
         process: asyncio.subprocess.Process | None = None
+        codex_rules_file: Path | None = None
         tokens_in = tokens_out = 0
         success = False
         summary = ""
@@ -453,12 +455,11 @@ class AgentService:
                 raise AgentError(f"backend {backend} requer '{_CLI_BINARIES[backend]}' instalado e disponível no PATH")
 
             if backend == "codex":
+                codex_rules_file = _write_codex_rules(approval_patterns)
                 command = [
                     executable,
                     "exec",
                     "--json",
-                    "--sandbox",
-                    "workspace-write",
                     "--approve-for-me",
                     "--cd",
                     str(root),
@@ -474,10 +475,17 @@ class AgentService:
                     "auto",
                     "--permission-prompts",
                     "none",
-                    "--append-system-prompt",
-                    f"{instructions}\n\n{policy}",
-                    prompt,
                 ]
+                disallowed_tools = _claude_disallowed_tools(approval_patterns)
+                if disallowed_tools:
+                    command.extend(["--disallowedTools", *disallowed_tools])
+                command.extend(
+                    [
+                        "--append-system-prompt",
+                        f"{instructions}\n\n{policy}",
+                        prompt,
+                    ]
+                )
 
             async with asyncio.timeout(max(60, duration_minutes * 60)):
                 process = await asyncio.create_subprocess_exec(
@@ -526,6 +534,12 @@ class AgentService:
             logger.exception("falha na sessão %s do backend %s", session_id, backend)
             summary = f"Falha: {type(exc).__name__}: {exc}"
             tool_error = summary
+        finally:
+            if codex_rules_file is not None:
+                try:
+                    codex_rules_file.unlink(missing_ok=True)
+                except OSError:
+                    logger.warning("não consegui remover regras temporárias do Codex", exc_info=True)
 
         status = "ended" if success else "error"
         await self._finish(session_id, status, summary, tokens_in, tokens_out, started)
@@ -876,11 +890,71 @@ def _cli_environment() -> dict[str, str]:
         "all_proxy",
         "no_proxy",
     }
-    return {
+    environment = {
         key: value
         for key, value in os.environ.items()
         if key in allowed
     }
+    if environment.get("CODEX_HOME"):
+        environment["CODEX_HOME"] = str(Path(environment["CODEX_HOME"]).expanduser().resolve())
+    return environment
+
+
+def _write_codex_rules(patterns: list[str]) -> Path | None:
+    """Instala deny rules efêmeras no escopo do usuário enquanto Codex executa."""
+    rules: list[str] = []
+    for pattern in patterns:
+        try:
+            tokens = shlex.split(pattern)
+        except ValueError as exc:
+            raise AgentError(f"padrão de aprovação inválido para Codex: {pattern!r}") from exc
+        if not tokens:
+            continue
+        reason = (
+            f"requer aprovação humana; o CLI do LEA não pode aprovar "
+            f"{pattern!r} automaticamente"
+        )
+        # ``match`` documenta um exemplo concreto para a regra e permite
+        # verificar a interpretação com ``codex execpolicy check``.
+        example = json.dumps([tokens + ["__lea_agent_policy_check__"]], ensure_ascii=False)
+        rules.append(
+            "prefix_rule(\n"
+            f"    pattern = {json.dumps(tokens, ensure_ascii=False)},\n"
+            '    decision = "forbidden",\n'
+            f"    justification = {json.dumps(reason, ensure_ascii=False)},\n"
+            f"    match = {example},\n"
+            ")"
+        )
+    if not rules:
+        return None
+
+    codex_home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")).expanduser().resolve()
+    rules_dir = codex_home / "rules"
+    rules_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    fd, name = tempfile.mkstemp(prefix="lea-agent-", suffix=".rules", dir=rules_dir)
+    path = Path(name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            stream.write("\n\n".join(rules) + "\n")
+    except Exception:
+        path.unlink(missing_ok=True)
+        raise
+    return path
+
+
+def _claude_disallowed_tools(patterns: list[str]) -> list[str]:
+    """Converte padrões do LEA em deny rules nativas do Bash tool do Claude."""
+    result = []
+    for pattern in patterns:
+        if not pattern.strip():
+            continue
+        if any(character in pattern for character in "()\r\n"):
+            # O formato do Claude usa parênteses para delimitar o padrão. Se
+            # uma entrada não puder ser representada sem ambiguidade, negamos
+            # todo o shell nesta execução em vez de perder a restrição.
+            return ["Bash"]
+        result.append(f"Bash(*{pattern}*)")
+    return result
 
 
 async def _read_stream_capped(

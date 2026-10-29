@@ -133,8 +133,11 @@ Codex CLI; cada tarefa ou automação pode escolher `codex`, `claude-code` ou
 usam suas autenticações locais. O Codex roda em sandbox `workspace-write` com
 revisão automática de permissões. O Claude Code roda no modo `auto`, e prompts
 que exigiriam interação são negados. As regras `require_approval_for` são
-aplicadas diretamente às ferramentas do modo API e também incluídas como
-instruções nos modos CLI, cujas permissões locais continuam sendo a autoridade.
+aplicadas diretamente às ferramentas do modo API; nos modos CLI, o LEA instala
+os padrões configurados como regras temporárias de bloqueio nativas do Codex e
+negações nativas do Bash do Claude Code. Uma ação protegida é recusada na
+execução CLI, pois ainda não existe fluxo interativo para encaminhá-la a uma
+pessoa.
 `POST /api/agent/runs` e `POST /api/automations` aceitam `backend`; se ausente,
 valem `agent.default_backend`.
 
