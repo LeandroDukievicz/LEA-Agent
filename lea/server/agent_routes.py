@@ -50,6 +50,31 @@ async def stop_agent_run(request: Request, session_id: str) -> dict[str, Any]:
     return {"id": session_id, "status": "stopping"}
 
 
+@router.get("/agent/approvals")
+async def list_agent_approvals(request: Request) -> dict[str, Any]:
+    approvals = await _agent(request).list_approvals("pending")
+    return {"approvals": approvals}
+
+
+@router.post("/agent/approvals/{approval_id}/decision")
+async def decide_agent_approval(
+    request: Request,
+    approval_id: str,
+    payload: Annotated[dict[str, Any], Body()],
+) -> dict[str, Any]:
+    decision = payload.get("decision")
+    if not isinstance(decision, str) or decision not in {"approve", "deny"}:
+        raise HTTPException(status_code=422, detail="decision precisa ser 'approve' ou 'deny'")
+    session_id = await _agent(request).decide_approval(approval_id, str(decision), decided_by="ui")
+    if session_id is None:
+        raise HTTPException(status_code=409, detail="aprovação não está mais pendente")
+    return {
+        "id": approval_id,
+        "session_id": session_id,
+        "status": "approved" if decision == "approve" else "denied",
+    }
+
+
 # ── skills ───────────────────────────────────────────────────────────────
 
 

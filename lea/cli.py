@@ -12,6 +12,7 @@ import asyncio
 import json
 import logging
 import os
+import shlex
 import sys
 from typing import Annotated, Any
 
@@ -34,6 +35,14 @@ app = typer.Typer(
 console = Console()
 err_console = Console(stderr=True)
 
+approval_commands = typer.Typer(
+    name="approvals",
+    help="Revisa ações do lea-agent que estão aguardando uma decisão humana.",
+    no_args_is_help=True,
+    add_completion=False,
+)
+app.add_typer(approval_commands, name="approvals")
+
 
 @app.callback()
 def _root(
@@ -50,6 +59,83 @@ def _root(
 def version() -> None:
     """Mostra a versão."""
     console.print(f"lea {__version__}")
+
+
+@approval_commands.command("list")
+def list_pending_approvals() -> None:
+    """Lista ações aguardando aprovação."""
+    from lea.agent import list_approvals as fetch_approvals
+
+    async def load_approvals() -> list[dict[str, Any]]:
+        paths.ensure_layout()
+        async with db.connection() as conn:
+            return await fetch_approvals(conn, "pending")
+
+    approvals = asyncio.run(load_approvals())
+    if not approvals:
+        console.print("Nenhuma aprovação pendente.")
+        return
+    table = Table(title="Aprovações pendentes")
+    table.add_column("ID", style="cyan")
+    table.add_column("Sessão")
+    table.add_column("Projeto")
+    table.add_column("Tarefa")
+    table.add_column("Comando")
+    table.add_column("Motivo")
+    for approval in approvals:
+        command_input = approval.get("input") or {}
+        argv = command_input.get("argv")
+        command = (
+            shlex.join(argv)
+            if isinstance(argv, list) and all(isinstance(arg, str) for arg in argv)
+            else "(inválido)"
+        )
+        cwd = command_input.get("cwd")
+        if cwd:
+            command = f"{command} · cwd={cwd}"
+        table.add_row(
+            str(approval["id"]),
+            str(approval["session_id"]),
+            str(approval.get("project_slug") or approval.get("project_id") or "—"),
+            str(approval.get("task") or "—"),
+            command,
+            str(approval["reason"]),
+        )
+    console.print(table)
+
+
+@approval_commands.command("approve")
+def approve_pending_action(
+    approval_id: Annotated[str, typer.Argument(help="Id exibido por `lea approvals list`.")],
+) -> None:
+    """Aprova uma única execução de comando."""
+    _decide_pending_action(approval_id, "approve")
+
+
+@approval_commands.command("deny")
+def deny_pending_action(
+    approval_id: Annotated[str, typer.Argument(help="Id exibido por `lea approvals list`.")],
+) -> None:
+    """Recusa a ação e encerra a tarefa que a solicitou."""
+    _decide_pending_action(approval_id, "deny")
+
+
+def _decide_pending_action(approval_id: str, decision: str) -> None:
+    from lea.agent import resolve_approval
+
+    async def resolve() -> str | None:
+        paths.ensure_layout()
+        async with db.connection() as conn:
+            return await resolve_approval(conn, approval_id, decision, decided_by="cli")
+
+    session_id = asyncio.run(resolve())
+    if session_id is None:
+        err_console.print(
+            f"[red]aprovação pendente não encontrada ou sessão encerrada:[/] {approval_id}"
+        )
+        raise typer.Exit(1)
+    decision_label = "aprovada" if decision == "approve" else "recusada"
+    console.print(f"Ação {decision_label}; sessão [cyan]{session_id}[/] retomada.")
 
 
 @app.command()

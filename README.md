@@ -154,14 +154,34 @@ uv run lea run --project 1 --backend claude-code --task "prepare uma release" --
 uv run lea run --project 1 --backend anthropic-api --task "resuma o projeto"
 ```
 
+No modo `anthropic-api`, comandos que correspondem a `require_approval_for`
+pausam a sessão e aguardam uma decisão. Revise a ação e aprove ou recuse pelo
+terminal, em outra janela enquanto a tarefa aguarda:
+
+```bash
+uv run lea approvals list
+uv run lea approvals approve approval-0123456789abcdef
+# ou
+uv run lea approvals deny approval-0123456789abcdef
+```
+
+Substitua o exemplo pelo ID mostrado na lista.
+
+O mesmo fluxo está disponível pela API autenticada: `GET /api/agent/approvals`
+lista a fila e `POST /api/agent/approvals/{id}/decision` recebe
+`{"decision":"approve"}` ou `{"decision":"deny"}`. Aprovar libera apenas
+aquele comando; recusar encerra a tarefa. Nos backends Codex CLI e Claude Code,
+ações protegidas continuam bloqueadas até a integração dos prompts nativos de
+aprovação.
+
 Todos os backends recebem contexto da wiki e, opcionalmente, uma skill. O modo
 `anthropic-api` usa as ferramentas do LEA, limita caminhos ao projeto e bloqueia
-comandos configurados para revisão. O Codex roda com sandbox `workspace-write`
-e revisão automática de permissões. Os padrões de `require_approval_for` viram
-regras temporárias de bloqueio no Codex e negações nativas de comandos Bash no
-Claude Code. O modo `auto` do Claude não abre prompts de permissão; comandos
-protegidos são recusados durante a tarefa, não colocados numa fila de aprovação
-humana. O LEA impõe limite de duração aos três
+comandos configurados para revisão até que uma pessoa os aprove. O Codex roda
+com sandbox `workspace-write` e revisão automática de permissões. Os padrões de
+`require_approval_for` viram regras temporárias de bloqueio no Codex e negações
+nativas de comandos Bash no Claude Code. O modo `auto` do Claude não abre
+prompts de permissão; comandos protegidos são recusados durante a tarefa, sem
+entrar na fila de aprovação humana. O LEA impõe limite de duração aos três
 backends. Limites de tokens do agente e métricas de custo continuam disponíveis
 apenas no modo API e em fases posteriores; para o consumo dos CLIs, consulte o
 próprio Codex ou Claude Code. Habilite autonomia somente em projetos nos quais

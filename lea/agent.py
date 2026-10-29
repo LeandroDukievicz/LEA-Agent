@@ -209,6 +209,24 @@ class AgentService:
         task.cancel()
         return True
 
+    async def list_approvals(self, status: str | None = "pending") -> list[dict[str, Any]]:
+        return await list_approvals(self.conn, status)
+
+    async def decide_approval(
+        self,
+        approval_id: str,
+        decision: str,
+        decided_by: str = "ui",
+    ) -> str | None:
+        session_id = await resolve_approval(self.conn, approval_id, decision, decided_by)
+        if session_id is not None:
+            await self._event(
+                session_id,
+                "alert",
+                {"event": "approval_decided", "approval_id": approval_id, "decision": decision},
+            )
+        return session_id
+
     async def shutdown(self) -> None:
         tasks = list(self._tasks.values())
         for task in tasks:
@@ -321,15 +339,7 @@ class AgentService:
                         break
 
                     tool_results = []
-                    approval_reason = next(
-                        (
-                            reason
-                            for block in tool_uses
-                            if (reason := _approval_reason(str(block.name), block.input, approval_patterns))
-                        ),
-                        None,
-                    )
-                    approval_blocked = approval_reason is not None
+                    approval_failure: str | None = None
                     for block in tool_uses:
                         name = str(block.name)
                         arguments = block.input if isinstance(block.input, dict) else {}
@@ -338,19 +348,50 @@ class AgentService:
                             "tool_call",
                             {"name": name, "input": _safe_tool_input(name, arguments)},
                         )
-                        if approval_blocked:
-                            result = f"Blocked: {approval_reason}; nenhuma chamada deste lote foi executada."
+                        required_approval = _approval_reason(name, arguments, approval_patterns)
+                        approved = False
+                        if approval_failure is not None:
+                            result = (
+                                "Blocked: outra chamada deste lote foi recusada; "
+                                "esta chamada não foi executada."
+                            )
                             is_error = True
                         else:
                             try:
-                                result = await self._tool(
-                                    name,
-                                    arguments,
-                                    root=root,
-                                    approval_patterns=approval_patterns,
-                                )
-                                is_error = result.startswith("Blocked:")
-                                approval_blocked = is_error
+                                if required_approval:
+                                    approved = await self._request_approval(
+                                        session_id=session_id,
+                                        backend=backend,
+                                        name=name,
+                                        arguments=arguments,
+                                        reason=required_approval,
+                                    )
+                                    if not approved:
+                                        approval_failure = required_approval
+                                        result = (
+                                            "Denied: ação recusada na aprovação humana "
+                                            f"({required_approval})."
+                                        )
+                                        is_error = True
+                                    else:
+                                        result = await self._tool(
+                                            name,
+                                            arguments,
+                                            root=root,
+                                            approval_patterns=approval_patterns,
+                                            approval_granted=True,
+                                        )
+                                        is_error = result.startswith("Blocked:")
+                                else:
+                                    result = await self._tool(
+                                        name,
+                                        arguments,
+                                        root=root,
+                                        approval_patterns=approval_patterns,
+                                    )
+                                    is_error = result.startswith("Blocked:")
+                                    if is_error:
+                                        approval_failure = result
                             except Exception as exc:
                                 logger.exception("lea-agent tool %s failed", name)
                                 result = f"Tool error: {type(exc).__name__}: {exc}"
@@ -365,8 +406,11 @@ class AgentService:
                             {"type": "tool_result", "tool_use_id": block.id, "content": result, "is_error": is_error}
                         )
                     messages.append({"role": "user", "content": tool_results})
-                    if approval_blocked:
-                        tool_error = f"A tarefa parou para revisão manual: {approval_reason}."
+                    if approval_failure is not None:
+                        tool_error = (
+                            "A tarefa foi interrompida após a decisão de aprovação: "
+                            f"{approval_failure}."
+                        )
                         summary = tool_error
                         break
                     if tokens_in + tokens_out >= max_tokens:
@@ -572,6 +616,7 @@ class AgentService:
         *,
         root: Path,
         approval_patterns: list[str],
+        approval_granted: bool = False,
     ) -> str:
         if name == "list_files":
             directory = _resolve_project_path(root, str(arguments.get("directory") or ""))
@@ -625,7 +670,7 @@ class AgentService:
             if any(not isinstance(item, str) or "\0" in item for item in argv):
                 return "Error: todos os argumentos precisam ser textos sem NUL."
             approval = _approval_reason(name, {"argv": argv}, approval_patterns)
-            if approval:
+            if approval and not approval_granted:
                 return f"Blocked: {approval}; nada foi executado."
             cwd = _resolve_project_path(root, str(arguments.get("cwd") or ""))
             if not cwd.is_dir():
@@ -661,6 +706,74 @@ class AgentService:
             return f"exit_code={process.returncode}\n{decoded}{suffix}"
 
         return f"Error: ferramenta desconhecida: {name}"
+
+    async def _request_approval(
+        self,
+        *,
+        session_id: str,
+        backend: str,
+        name: str,
+        arguments: dict[str, Any],
+        reason: str,
+    ) -> bool:
+        approval_id = f"approval-{secrets.token_hex(8)}"
+        command_input = {"argv": arguments.get("argv"), "cwd": arguments.get("cwd")}
+        requested_at = _now()
+        await self.conn.execute(
+            "INSERT INTO agent_approvals "
+            "(id, session_id, backend, tool_name, input_json, reason, status, requested_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)",
+            (
+                approval_id,
+                session_id,
+                backend,
+                name,
+                json.dumps(command_input, ensure_ascii=False),
+                reason,
+                requested_at,
+            ),
+        )
+        await self.conn.execute("UPDATE sessions SET status = 'paused' WHERE id = ?", (session_id,))
+        await self.conn.commit()
+        argv = command_input.get("argv")
+        command = (
+            shlex.join(argv)
+            if isinstance(argv, list) and all(isinstance(arg, str) for arg in argv)
+            else ""
+        )
+        try:
+            await self._event(
+                session_id,
+                "alert",
+                {
+                    "event": "approval_requested",
+                    "approval_id": approval_id,
+                    "tool": name,
+                    "command": command,
+                    "cwd": command_input.get("cwd"),
+                    "reason": reason,
+                },
+            )
+            while True:
+                async with self.conn.execute(
+                    "SELECT status FROM agent_approvals WHERE id = ?",
+                    (approval_id,),
+                ) as cursor:
+                    row = await cursor.fetchone()
+                if row is None or row["status"] == "expired":
+                    return False
+                if row["status"] == "approved":
+                    return True
+                if row["status"] == "denied":
+                    return False
+                await asyncio.sleep(0.5)
+        finally:
+            await self.conn.execute(
+                "UPDATE agent_approvals SET status = 'expired', decided_at = ? "
+                "WHERE id = ? AND status = 'pending'",
+                (_now(), approval_id),
+            )
+            await self.conn.commit()
 
     def _approval_patterns(self, project_patterns: str) -> list[str]:
         try:
@@ -699,6 +812,69 @@ class AgentService:
             "session_end",
             {"status": status, "summary": summary, "tokens_in": tokens_in, "tokens_out": tokens_out, "duration_ms": duration},
         )
+
+
+async def resolve_approval(
+    conn: aiosqlite.Connection,
+    approval_id: str,
+    decision: str,
+    decided_by: str = "cli",
+) -> str | None:
+    """Registra uma decisão pendente e retoma a sessão que a solicitou."""
+    if decision not in {"approve", "deny"}:
+        raise ValueError("decision precisa ser 'approve' ou 'deny'")
+    new_status = "approved" if decision == "approve" else "denied"
+    async with conn.execute(
+        "SELECT session_id FROM agent_approvals WHERE id = ? AND status = 'pending'",
+        (approval_id,),
+    ) as cursor:
+        row = await cursor.fetchone()
+    if row is None:
+        return None
+    session_id = str(row["session_id"])
+    cursor = await conn.execute(
+        "UPDATE agent_approvals SET status = ?, decided_at = ?, decision_by = ? "
+        "WHERE id = ? AND status = 'pending' "
+        "AND EXISTS (SELECT 1 FROM sessions WHERE id = ? AND status = 'paused')",
+        (new_status, _now(), decided_by, approval_id, session_id),
+    )
+    if cursor.rowcount != 1:
+        await conn.commit()
+        return None
+    await conn.execute(
+        "UPDATE sessions SET status = 'active' WHERE id = ? AND status = 'paused'",
+        (session_id,),
+    )
+    await conn.commit()
+    return session_id
+
+
+async def list_approvals(
+    conn: aiosqlite.Connection,
+    status: str | None = "pending",
+) -> list[dict[str, Any]]:
+    query = (
+        "SELECT a.*, s.project_id, s.task, p.slug AS project_slug "
+        "FROM agent_approvals a "
+        "JOIN sessions s ON s.id = a.session_id "
+        "LEFT JOIN projects p ON p.id = s.project_id"
+    )
+    params: tuple[Any, ...] = ()
+    if status is not None:
+        query += " WHERE a.status = ?"
+        params = (status,)
+    query += " ORDER BY a.requested_at DESC, a.id"
+    async with conn.execute(query, params) as cursor:
+        rows = await cursor.fetchall()
+    result = []
+    for row in rows:
+        item = dict(row)
+        try:
+            item["input"] = json.loads(item.pop("input_json"))
+        except (json.JSONDecodeError, TypeError):
+            item["input"] = {}
+        result.append(item)
+    return result
 
 
 def _system_prompt(project_slug: str, selection: Any, skill: skills.SkillDocument | None) -> str:

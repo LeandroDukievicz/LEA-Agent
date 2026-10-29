@@ -114,6 +114,8 @@ POST /api/handoffs/{id}/claim         assume: inicia sessão em modo handoff
 ```
 POST  /api/agent/runs                    inicia tarefa em modo autônomo
 POST  /api/agent/runs/{id}/stop          interrompe a tarefa
+GET   /api/agent/approvals               lista ações aguardando aprovação
+POST  /api/agent/approvals/{id}/decision aprova ou recusa uma ação
 GET   /api/skills                        lista skills indexadas
 POST  /api/skills                        cria SKILL.md
 GET   /api/skills/{name}                 lê skill
@@ -143,10 +145,15 @@ valem `agent.default_backend`.
 
 O modo API recebe ferramentas de leitura e escrita limitadas ao projeto, além
 de execução de programas sem shell. Comandos que correspondem à lista global
-ou do projeto são recusados antes da execução. Comandos permitidos e os CLIs
-locais rodam sob o usuário local; habilite autonomia apenas para projetos em
-que confia. O LEA impõe limite de duração a todos os backends; os limites de
-tokens são aplicados pelo modo API.
+ou do projeto pausam a sessão e criam uma aprovação persistida no SQLite. A
+decisão libera somente aquele comando; a recusa encerra a tarefa. Os comandos
+`lea approvals list`, `lea approvals approve <id>` e `lea approvals deny <id>`
+permitem revisar e decidir pelo terminal. Os endpoints de aprovação usam o
+token da UI. No Codex CLI e no Claude Code,
+comandos protegidos ainda são bloqueados até a integração dos prompts nativos.
+Comandos permitidos e os CLIs locais rodam sob o usuário local; habilite
+autonomia apenas em projetos em que confia. O LEA impõe limite de duração a
+todos os backends; os limites de tokens são aplicados pelo modo API.
 
 Skills ficam em `~/.lea/skills/<nome>/SKILL.md`; ao iniciar, o daemon importa
 novos arquivos e indexa edições. O Markdown guarda o conteúdo e o SQLite guarda
@@ -156,8 +163,9 @@ calcula a próxima execução em UTC, faz claim antes de disparar e marca execu�
 inacabadas como interrompidas após reiniciar. O backend fica salvo com cada
 automação; as anteriores à migração passam a usar Codex.
 
-Esta é a base da Fase 5. Revisão automática de skills, fluxo interativo de
-aprovação, custo monetário e canais ainda não estão ligados ao agente próprio.
+Esta é a base da Fase 5. O fluxo de aprovação está ligado ao backend API;
+prompts nativos de aprovação dos CLIs, revisão automática de skills, custo
+monetário e canais ainda não estão ligados ao agente próprio.
 
 ## Invariantes que o código assume
 

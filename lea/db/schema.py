@@ -272,7 +272,27 @@ _CLI_AGENT_BACKENDS: tuple[str, ...] = (
     "CHECK (agent_backend IN ('codex', 'claude-code', 'anthropic-api'))",
 )
 
-MIGRATIONS: tuple[tuple[str, ...], ...] = (_INITIAL, _CLI_AGENT_BACKENDS)
+_AGENT_APPROVALS: tuple[str, ...] = (
+    """
+    CREATE TABLE agent_approvals (
+        id           TEXT PRIMARY KEY,
+        session_id   TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+        backend      TEXT NOT NULL,
+        tool_name    TEXT NOT NULL,
+        input_json   TEXT NOT NULL,
+        reason       TEXT NOT NULL,
+        status       TEXT NOT NULL DEFAULT 'pending'
+                     CHECK (status IN ('pending', 'approved', 'denied', 'expired')),
+        requested_at TEXT NOT NULL,
+        decided_at   TEXT,
+        decision_by  TEXT
+    )
+    """,
+    "CREATE INDEX idx_agent_approvals_status_at ON agent_approvals(status, requested_at DESC)",
+    "CREATE INDEX idx_agent_approvals_session ON agent_approvals(session_id, requested_at DESC)",
+)
+
+MIGRATIONS: tuple[tuple[str, ...], ...] = (_INITIAL, _CLI_AGENT_BACKENDS, _AGENT_APPROVALS)
 
 #: Versão alvo do esquema.
 LATEST_VERSION = len(MIGRATIONS)
