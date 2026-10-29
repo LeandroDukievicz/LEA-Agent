@@ -15,11 +15,25 @@
   // How long each state holds before she falls back to neutral.
   const LINGER = {listening: 2600, thinking: 0, speaking: 0};
 
+  // Served by the daemon itself, so the API is the same origin and needs no CORS. Only the
+  // token has to arrive: ?token=... stores it and is then stripped from the URL, so it does
+  // not linger in history or in a screenshot.
+  const bootstrap = () => {
+    const params = new URLSearchParams(location.search);
+    if (!params.get('token')) return;
+    const saved = {token: params.get('token'), projectId: Number(params.get('project')) || 1};
+    try { localStorage.setItem('lea.api', JSON.stringify(saved)); } catch { /* private mode */ }
+    params.delete('token');
+    params.delete('project');
+    const rest = params.toString();
+    history.replaceState(null, '', location.pathname + (rest ? '?' + rest : ''));
+  };
+
   const config = () => {
     const given = window.LEA_API || {};
     let stored = {};
     try { stored = JSON.parse(localStorage.getItem('lea.api') || '{}'); } catch { /* private mode */ }
-    const merged = {...stored, ...given};
+    const merged = {base: location.origin, ...stored, ...given};
     return merged.base && merged.token ? merged : null;
   };
 
@@ -155,6 +169,7 @@
 
   window.LeaPresence = presence;
   const start = () => {
+    bootstrap();
     const avatar = document.querySelector('lea-avatar');
     if (avatar) presence.attach(avatar);
     presence.connect();

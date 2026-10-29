@@ -23,6 +23,7 @@ import json
 import logging
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Annotated, Any
 
 import aiosqlite
@@ -37,6 +38,8 @@ from lea import handoffs
 from lea import skills
 from lea.agent import AgentService
 from lea.cron import CronScheduler
+from fastapi.staticfiles import StaticFiles
+
 from lea.memory.inject import render as render_context
 from lea.security import tokens
 from lea.server import agent_routes, handoff_routes, memory_routes, session_routes
@@ -365,3 +368,16 @@ app.include_router(agent_routes.router, dependencies=[Depends(require_ui_token)]
 # desconhecida. O FastAPI casa na ordem de registro.
 app.include_router(handoff_routes.router, dependencies=[Depends(require_ui_token)])
 app.include_router(session_routes.router, dependencies=[Depends(require_ui_token)])
+
+
+# ── protótipo de interface ───────────────────────────────────────────────
+
+# O protótipo em `app/` é servido pelo próprio daemon, e não por um servidor
+# estático à parte, porque assim ele roda na MESMA origem da API. Isso evita
+# abrir CORS: um `Access-Control-Allow-Origin` aqui deixaria qualquer página
+# que o usuário visitasse tentar falar com o daemon, e escutar em 127.0.0.1
+# já não autentica ninguém. Fora isso, o protótipo não decide a camada de
+# interface -- some junto com o diretório se ele não existir.
+_PROTOTYPE = Path(__file__).resolve().parents[2] / "app"
+if _PROTOTYPE.is_dir():
+    app.mount("/app", StaticFiles(directory=_PROTOTYPE, html=True), name="prototype")

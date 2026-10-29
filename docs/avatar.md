@@ -106,13 +106,17 @@ Não use o atributo `for`: runtimes no estilo React o reescrevem e o elemento pe
 
 **Quem responde.** Ao apertar Enter no chat, o módulo manda a tarefa para `POST /api/agent/runs` com `backend: "codex"` e acompanha a sessão pelo websocket `/ws`. O Codex já é o backend padrão em `lea/config.py`; o que faltava era a interface conversar com ele.
 
-Para ligar, defina antes do script:
+Para ligar, abra o protótipo **pelo próprio daemon**, passando o token uma vez:
 
-```js
-window.LEA_API = {base: 'http://127.0.0.1:7420', token: '<ui token>', projectId: 1};
+```
+http://127.0.0.1:7420/app/index.html?token=<conteúdo de ~/.lea/ui_token>&project=1
 ```
 
-Ou guarde o mesmo objeto em `localStorage` sob a chave `lea.api`. Sem configuração o módulo fica inerte: a página segue como demonstração e só os sinais locais (digitação, teste de fala) mexem o rosto dela.
+O módulo guarda o token em `localStorage` e o apaga da URL, para ele não ficar no histórico nem numa captura de tela. Nas próximas vezes basta `http://127.0.0.1:7420/app/index.html`.
+
+O daemon serve `app/` em `/app` justamente para a página ficar na **mesma origem** da API. Servir o protótipo de outra porta exigiria abrir CORS no daemon, e aí qualquer página que você visitasse poderia tentar falar com ele — escutar em 127.0.0.1 não autentica ninguém.
+
+Também dá para configurar à mão com `window.LEA_API = {base, token, projectId}`. Sem token o módulo fica inerte: a página segue como demonstração e só os sinais locais (digitação, teste de fala) mexem o rosto dela.
 
 O seletor de expressão no painel começa em **Automática (contexto)**. Escolher uma expressão fixa assume o controle; voltar para automática devolve.
 
