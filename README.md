@@ -17,6 +17,8 @@ Diferente de um agente que quer substituir os outros, o LEA deixa cada agente
 continuar sendo ele mesmo e fica **entre** eles, como camada de memória e
 supervisão. Ver [docs/estudo-hermes.md](docs/estudo-hermes.md).
 
+![Centro de Comando LEA](docs/screenshots/01-overview.png)
+
 ## Estado: Fases 1 a 4 concluídas; Fase 5 em andamento
 
 O núcleo é um **daemon headless** com API local, WebSocket de eventos e receptor
@@ -33,7 +35,7 @@ homelab e trocar a camada visual sem mexer no produto.
 | ✅ Fase 6 | bots Telegram e Discord com allowlist e rotas por projeto |
 | 🟡 Fase 7 | custo estimado da Anthropic API; empacotamento pendente |
 
-A camada de interface ainda não foi escolhida — ver [Protótipo](#protótipo).
+A camada de interface ainda não foi escolhida — ver [Interface & Telas do Projeto](#interface--telas-do-projeto).
 
 ## Rodar
 
@@ -386,39 +388,113 @@ pelos testes.
   real aconteceria na injeção.
 - Dependências com **pin exato**, para que nenhuma versão nova chegue sem revisão.
 
-## Protótipo
+## Interface & Telas do Projeto
 
-A fonte da verdade visual, ainda sem backend — números, sessões e custos são
-dados fictícios escritos no próprio arquivo.
+A interface do LEA é um centro de comando desktop com estética cyberpunk/terminal dark, combinando supervisão operacional em tempo real, navegação em grafos de conhecimento, terminal interativo e um **avatar 3D em voxels WebGL (Three.js)** com sincronia labial e onda de áudio reativa.
 
 ```
 wireframe.html     protótipo, página única autocontida
 app/               o mesmo protótipo desempacotado em arquivos
+docs/screenshots/  capturas de tela em alta resolução
 ```
 
-Para ver, sirva o diretório (os assets carregam por caminho relativo):
+Para rodar a interface localmente:
 
 ```bash
 python3 -m http.server 8731
-# http://127.0.0.1:8731/app/index.html
+# Acesse: http://127.0.0.1:8731/app/index.html
 ```
 
-Telas: Overview, Projetos, Console, Memória, Skills, Histórico & Handoffs,
-Automações, Canais & Agentes.
+Ou acesse pelo daemon ativo (mesma origem da API):
 
-O painel lateral traz só o avatar 3D e a onda sonora — sem controles, porque
-as quatro expressões são comandadas pelo agente, não escolhidas à mão: **neutra**
-ociosa, **ouvindo** enquanto você digita ou grava áudio, **pensando** enquanto os
-agentes trabalham, **falando** quando ela de fato responde. A lente óptica fica
-vermelha enquanto ela pensa, e a boca e a onda acompanham a voz.
-
-Abra pelo próprio daemon, para a página ficar na mesma origem da API:
-
-```
+```bash
 http://127.0.0.1:7420/app/index.html?token=$(cat ~/.lea/ui_token)&project=1
 ```
 
-Veja [Avatar LEA](docs/avatar.md).
+---
+
+### 01 · Overview (Visão Geral do Enxame)
+
+Supervisão global em tempo real: telemetria de harnesses conectados (`claude-code`, `codex`, `cursor`, `gemini-cli`, `lea-agent`, `aider`), total de páginas de memória por tier, handoffs pendentes de claim, consumo financeiro e orçamento de tokens por hora, além do **Live Feed** com stream de eventos de ferramentas, leituras, commits e mensagens.
+
+![01 Overview](docs/screenshots/01-overview.png)
+
+---
+
+### 02 · Projetos
+
+Gerenciamento dos repositórios monitorados, branches de trabalho, agentes ativos em cada projeto com controle de sessão (abrir console, pausar, parar), contagem de páginas de memória vinculadas e handoffs em espera.
+
+![02 Projetos](docs/screenshots/02-projetos.png)
+
+---
+
+### 03 · Console Interativo & Terminal
+
+Ambiente direto de diálogo e execução com o agente (lea-agent ou harness selecionado). Exibe o contexto injetado (páginas de memória, handoff ativo, preferências globais), tool calls com status de saída e tempo de execução, métricas de tokens em tempo real e menu de **Slash Commands** (`/model`, `/skills`, `/compress`, `/memory`, `/handoff`, `/cron`, `/clear`).
+
+![03 Console](docs/screenshots/03-console.png)
+
+---
+
+### 04 · Memória Persistente (Wiki Git)
+
+Base de conhecimento compartilhada entre todos os agentes. Apresenta as páginas Markdown versionadas em Git com o cálculo de **decaimento de força** baseado em meia-vida (Tiers `HOT`, `WARM` e `COLD`), histórico de commits por página, links de entrada e saída (`[[backlinks]]`) e metadados de acesso recente.
+
+![04 Memória](docs/screenshots/04-memoria.png)
+
+---
+
+### 05 · Skills Aprendidas
+
+Catálogo de habilidades que os agentes adquirem, executam e aprimoram autonomamente. Inclui separação entre skills manuais e criadas pelo agente, histórico de evolução de versão, taxa de sucesso percentual e frequência de chamadas nos últimos 30 dias.
+
+![05 Skills](docs/screenshots/05-skills.png)
+
+---
+
+### 06 · Histórico & Handoffs
+
+Linha do tempo cronológica com todas as sessões executadas no enxame e a central de **Handoffs Pendentes**: cartões objetivos com *onde parou*, *o que falhou* e *itens em aberto*, com ação de `CLAIM` imediata para que qualquer agente assuma a continuidade do trabalho.
+
+![06 Histórico & Handoffs](docs/screenshots/06-historico-handoffs.png)
+
+---
+
+### 07 · Automações (Cron em Linguagem Natural)
+
+Agendamento de rotinas periódicas expressas em linguagem natural com tradução automática para formato cron. Acompanhamento de canais de notificação (Telegram, Discord, Slack, WhatsApp), tags de status e logs de execução com propostas de melhoria de skills.
+
+![07 Automações](docs/screenshots/07-automacoes.png)
+
+---
+
+### 08 · Canais & Agentes
+
+Matriz de integração dos **harnesses de código** (suporte verificado a `SessionStart`, `PostToolUse`, `PreCompact`, `Stop`, servidor MCP e leitura/escrita de memória) e gateway multicanal (Telegram, Discord, Slack, WhatsApp) com métricas de latência e rotas por projeto.
+
+![08 Canais & Agentes](docs/screenshots/08-canais-agentes.png)
+
+---
+
+### 09 · Launcher de Novo Agente
+
+Modal de inicialização rápida de agentes com configuração completa de contexto: escolha do projeto alvo, harness (`CC`, `CX`, `GM`, `CR`, `LE`), modo de execução (*Interativo*, *Autônomo* ou *Assumir Handoff*), criação de git worktree isolada e pré-visualização das páginas de memória injetadas.
+
+![09 Launcher Novo Agente](docs/screenshots/09-launcher-novo-agente.png)
+
+---
+
+### Painel Lateral & Avatar 3D (LEA)
+
+O painel lateral acompanha a navegação exibindo o avatar procedural em relevo de voxels WebGL e o visualizador de onda de áudio. Suas quatro expressões reagem organicamente aos estados do agente:
+
+- **Neutra (`neutral`)**: Estado de repouso com pulsos azuis saindo do implante óptico pelas trilhas de neon.
+- **Ouvindo (`listening`)**: Pulsos invertem a direção, fluindo para dentro da lente enquanto você digita ou grava áudio.
+- **Pensando (`thinking`)**: A lente óptica muda para **vermelho**, pálpebras baixam e pulsos desaceleram enquanto as ferramentas e LLMs processam.
+- **Falando (`speaking`)**: Sincronia labial e onda sonora conduzidas pela voz sintetizada da resposta.
+
+Para especificações detalhadas do avatar, consulte [docs/avatar.md](docs/avatar.md).
 
 Interface em português do Brasil; código, tabelas e APIs em inglês.
 
