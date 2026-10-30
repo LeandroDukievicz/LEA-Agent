@@ -263,21 +263,181 @@
 body{margin:0;background:#000;color:#d7e3ee;-webkit-font-smoothing:antialiased}
 a{color:#00f0ff;text-decoration:none}a:hover{color:#ff2bd6}
 ::selection{background:#ff2bd6;color:#0a0a0f}
-input::placeholder{color:#4f5d6e}
-.lea-shell{width:100%;grid-template-columns:232px minmax(0,1208px) minmax(380px,1fr)}
-.lea-avatar-panel{grid-column:3;grid-row:1;position:sticky;top:20px;align-self:start;padding:20px 20px 40px}
-.lea-avatar-panel>section{max-width:560px;margin-left:auto}
-@media (max-width:1650px){
+input::placeholder{color:#7e8c9b}
+/* barras de rolagem — regra única para toda a interface (Chrome/Edge/Safari) */
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:transparent;border:0}
+::-webkit-scrollbar-thumb{background:#2f4152;border:0;border-radius:0}
+::-webkit-scrollbar-thumb:hover{background:#475c70}
+::-webkit-scrollbar-thumb:active{background:#00f0ff}
+::-webkit-scrollbar-corner{background:transparent}
+::-webkit-scrollbar-button{display:none;width:0;height:0}
+/* Firefox: scrollbar-width/color desligam os pseudo-elementos acima no Chrome, então ficam isolados */
+@supports not selector(::-webkit-scrollbar){
+  *{scrollbar-width:thin;scrollbar-color:#2f4152 transparent}
+}
+/* barra sempre com o mesmo espaço reservado: nada de layout pulando */
+html,.lea-scroll{scrollbar-gutter:stable}
+/* ═════════ LAYOUT · grade principal ═════════ */
+.lea-shell{width:100%;grid-template-columns:232px minmax(0,1fr) clamp(336px,24vw,520px)}
+.lea-avatar-panel{grid-column:3;grid-row:1;position:sticky;top:0;align-self:start;padding:20px;box-sizing:border-box;
+  height:calc(100vh - 28px);height:calc(100dvh - 28px);display:flex;flex-direction:column;justify-content:center}
+.lea-avatar-panel>section{max-width:560px;margin-left:auto;width:100%;box-sizing:border-box}
+.lea-main{min-width:0;display:flex;flex-direction:column}
+.lea-head{min-width:0}
+.lea-head>span:first-child,.lea-head h1,.lea-head-time{flex:none;white-space:nowrap}
+.lea-head-sub{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lea-search{flex:0 1 260px;min-width:132px;overflow:hidden;white-space:nowrap}
+.lea-head-right{min-width:0}
+.lea-main-body{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;padding:24px 28px 34px}
+/* cada aba ocupa toda a altura livre; se o conteúdo passar disso, o documento rola */
+.lea-main-body>*{flex:1 1 auto;min-width:0;min-height:0}
+/* painéis presos à viewport: o histórico rola dentro do painel, nunca o documento */
+.lea-console,.lea-memoria{flex:1 1 0;min-height:380px}
+.lea-footer{overflow:hidden;white-space:nowrap}
+.lea-footer>span{min-width:0}
+.lea-nowrap{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lea-wrap{flex-wrap:wrap}
+.lea-tiers{display:grid;grid-template-columns:minmax(54px,90px) minmax(62px,110px) minmax(0,1fr)}
+.lea-slash{max-width:calc(100% - 32px)}
+.lea-push{margin-top:auto}
+
+/* ── 01 OVERVIEW ── */
+.lea-overview{display:grid;gap:16px;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(300px,420px);grid-template-rows:max-content auto auto;align-content:stretch}
+.lea-stats{grid-column:1 / -1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.lea-stats>div{justify-content:space-between}
+.lea-agents{grid-column:1 / 3;display:flex;flex-direction:column;min-width:0}
+.lea-agents-row{display:grid;grid-template-columns:28px minmax(0,1.5fr) 84px 62px minmax(0,1fr) 112px 58px;gap:10px}
+.lea-agents-row>*{min-width:0}
+.lea-agents-row>span,.lea-agents-row>span>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lea-agents>div:nth-child(n+3){flex:1 1 auto;min-height:38px}
+.lea-activity{grid-column:3;grid-row:2 / 4;min-height:0}
+.lea-activity-list{height:0;flex:1 1 auto;min-height:0;overflow:hidden auto}
+.lea-tokens>div:nth-child(2){flex:1 1 auto;justify-content:center}
+.lea-cron>div:nth-child(n+2){flex:1 1 auto;min-height:34px}
+.lea-cost-row{display:grid;grid-template-columns:28px minmax(0,1fr) 64px}
+.lea-cost-row>span:nth-child(2){overflow:hidden}
+
+/* ── 02 PROJETOS ── */
+.lea-projetos{display:grid;gap:16px;grid-template-columns:300px minmax(0,1fr)}
+.lea-proj-side{display:flex;flex-direction:column;gap:10px;min-width:0}
+.lea-proj-main{display:flex;flex-direction:column;gap:16px;min-width:0}
+.lea-proj-head{flex-wrap:wrap}
+.lea-proj-id{min-width:230px}
+.lea-proj-agents{flex:1 1 auto;min-height:190px}
+.lea-run-row{display:grid;gap:12px;grid-template-columns:28px minmax(0,1fr) 96px 110px 58px;
+  grid-template-areas:"badge nome status ctx tok" ". tarefa tarefa tarefa tarefa" "acoes acoes acoes acoes acoes"}
+.lea-run-row>span{min-width:0}
+.lea-run-row>span>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lea-run-row>:nth-child(1){grid-area:badge}
+.lea-run-row>:nth-child(2){grid-area:nome}
+.lea-run-row>:nth-child(3){grid-area:status}
+.lea-run-row>:nth-child(4){grid-area:tarefa}
+.lea-run-row>:nth-child(5){grid-area:ctx}
+.lea-run-row>:nth-child(6){grid-area:tok}
+.lea-run-row>:nth-child(7){grid-area:acoes;justify-content:flex-end}
+
+/* ── 03 CONSOLE ── */
+.lea-console{display:grid;gap:16px;grid-template-columns:minmax(0,1fr) minmax(260px,320px)}
+.lea-console-aside{display:flex;flex-direction:column;gap:16px;min-width:0}
+.lea-console-aside>section:last-child{flex:1 1 auto}
+
+/* ── 04 MEMÓRIA ── */
+.lea-memoria{display:grid;gap:16px;grid-template-columns:minmax(200px,236px) minmax(0,1fr) minmax(260px,320px)}
+.lea-mem-aside{display:flex;flex-direction:column;gap:16px;min-width:0;min-height:0;overflow:auto}
+.lea-mem-aside>section:last-child{flex:1 1 auto}
+
+/* ── 05 SKILLS ── */
+.lea-skills{display:flex;flex-direction:column;gap:16px}
+.lea-skills-head{display:flex;align-items:center;gap:24px;flex-wrap:wrap}
+.lea-skills-head>div{flex-wrap:wrap;min-width:0}
+.lea-skills-grid{flex:1 1 auto;display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));grid-auto-rows:auto;align-content:stretch}
+.lea-skills-grid>article>div:last-child{margin-top:auto}
+
+/* ── 06 HISTÓRICO & HANDOFFS ── */
+.lea-sessoes{display:grid;gap:16px;grid-template-columns:minmax(0,1fr) minmax(360px,460px)}
+
+/* ── 07 AUTOMAÇÕES ── */
+.lea-auto{display:flex;flex-direction:column;gap:16px}
+.lea-auto-new{flex-wrap:wrap}
+.lea-auto-tasks{flex:1 1 auto;display:flex;flex-direction:column}
+.lea-auto-tasks>div:nth-child(n+3){flex:1 1 auto;min-height:34px}
+.lea-cron-row{display:grid;grid-template-columns:minmax(0,1fr) 126px 124px 96px 190px;gap:14px}
+
+/* ── 08 CANAIS & AGENTES ── */
+.lea-canais{display:flex;flex-direction:column;gap:16px}
+.lea-matrix{display:flex;flex-direction:column;flex:1 1 auto;overflow-x:auto}
+.lea-matrix>div:nth-child(n+3){flex:1 1 auto;min-height:34px}
+.lea-matrix-row{display:grid;grid-template-columns:28px minmax(150px,1.2fr) 76px repeat(4,82px) 62px 82px 82px minmax(96px,1fr);gap:10px;min-width:1012px}
+.lea-platforms{flex:1 1 auto;display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(236px,1fr))}
+
+/* ── modais ── */
+.lea-modal-box{box-sizing:border-box;width:min(604px,calc(100vw - 40px))}
+.lea-launcher-box{box-sizing:border-box;width:min(950px,calc(100vw - 40px));max-height:calc(100vh - 56px);max-height:calc(100dvh - 56px)}
+
+/* ═════════ RESPONSIVO ═════════ */
+/* 1800px: a coluna do texto da wiki fica estreita demais com três colunas */
+@media (max-width:1800px){
+  .lea-memoria{grid-template-columns:minmax(200px,236px) minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto}
+  .lea-mem-aside{grid-column:1 / -1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;overflow:visible}
+  .lea-mem-aside>section:last-child{flex:0 1 auto}
+}
+/* 1560px: com o conteúdo abaixo de ~950px as colunas laterais estrangulam
+   conversa, linha do tempo e tabela de agentes */
+@media (max-width:1560px){
+  /* console e histórico passam a usar a largura inteira; o aside vira faixa */
+  .lea-sessoes{grid-template-columns:minmax(0,1fr)}
+  .lea-console{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto}
+  .lea-console-aside{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start}
+  .lea-console-aside>section:last-child{flex:0 1 auto}
+  /* em três colunas a tabela de agentes fica com ~450px e as células se atropelam:
+     ela ocupa a largura inteira e o feed desce para a coluna da direita */
+  .lea-overview{grid-template-columns:minmax(0,1fr) minmax(300px,380px);grid-template-rows:max-content auto auto auto}
+  .lea-agents{grid-column:1 / -1}
+  /* 4 cartões em ~190px quebram rótulo e número no meio */
+  .lea-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .lea-activity{grid-column:2;grid-row:3 / 5;min-height:300px}
+  .lea-tokens{grid-column:1;grid-row:3}
+  .lea-cron{grid-column:1;grid-row:4}
+}
+/* 1460px: encolhe colunas laterais, tabelas e respiro geral */
+@media (max-width:1460px){
+  .lea-main-body{padding:20px 20px 30px}
+  .lea-projetos{grid-template-columns:252px minmax(0,1fr)}
+  .lea-cron-row{grid-template-columns:minmax(0,1fr) 108px 108px 84px 152px;gap:10px}
+  .lea-footer{gap:12px}
+}
+/* 1280px: três colunas não cabem — avatar sai da lateral e vai para baixo */
+@media (max-width:1279px){
   .lea-shell{grid-template-columns:232px minmax(0,1fr)}
   .lea-navigation{grid-column:1;grid-row:1 / span 2}
-  .lea-shell>main{grid-column:2;grid-row:2}
-  .lea-avatar-panel{grid-column:2;grid-row:1;position:static;padding:16px 28px 0}
-  .lea-avatar-panel>section{max-width:460px}
+  /* o conteúdo vem primeiro: o avatar ocuparia a janela inteira antes da aba */
+  .lea-shell>main{grid-column:2;grid-row:1}
+  .lea-avatar-panel{grid-column:2;grid-row:2;position:static;height:auto;padding:4px 20px 36px}
+  .lea-avatar-panel>section{max-width:460px;margin:0 auto}
+  .lea-projetos{grid-template-columns:230px minmax(0,1fr)}
+  /* com o avatar no fluxo o documento rola: os painéis deixam de ser presos à
+     viewport e passam a limitar a própria altura */
+  .lea-console,.lea-memoria{flex:1 1 auto;min-height:0}
+  .lea-console>section{height:min(74vh,720px);min-height:440px}
+  .lea-memoria>section:nth-of-type(1){height:min(56vh,520px)}
+  .lea-memoria>section:nth-of-type(2){height:min(74vh,720px);min-height:440px}
+  .lea-footer>span:nth-child(5),.lea-footer>span:nth-child(6){display:none}
 }
-@media (max-width: 1100px) {
-  .lea-console {display:flex !important;flex-direction:column;height:auto !important;min-height:0 !important}
-  .lea-console > aside {display:contents !important}
-  .lea-console > section {min-height:620px !important}
+/* janela baixa: nenhum painel pode ultrapassar a altura da janela */
+@media (max-height:760px){
+  .lea-main-body{padding:16px 20px 24px}
+  .lea-console,.lea-memoria{min-height:320px}
+  .lea-skills-grid{align-content:start}
+}
+/* acima de 1850px a linha do agente cabe inteira numa linha só */
+@media (min-width:1850px){
+  .lea-run-row{grid-template-columns:28px minmax(130px,1fr) 92px minmax(190px,1.9fr) 104px 58px;
+    grid-template-areas:"badge nome status tarefa ctx tok" "acoes acoes acoes acoes acoes acoes"}
+}
+/* telas muito largas: cards de skill maiores, senão sobram colunas e falta linha */
+@media (min-width:2200px){
+  .lea-skills-grid{grid-template-columns:repeat(auto-fill,minmax(420px,1fr))}
 }
 @keyframes leaBlink{0%,50%{opacity:1}50.01%,100%{opacity:0}}
 @keyframes leaIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
@@ -289,24 +449,24 @@ input::placeholder{color:#4f5d6e}
 <div style="position:fixed;inset:0;pointer-events:none;z-index:50;background:repeating-linear-gradient(0deg,rgba(255,255,255,.022) 0,rgba(255,255,255,.022) 1px,transparent 1px,transparent 3px)"></div>
 </sc-if>
 
-<aside class="lea-navigation" style="position:sticky;top:0;height:calc(100vh - 28px);display:flex;flex-direction:column;border-right:1px solid #1a2733;background:#000">
-  <div style="padding:22px 20px 18px;border-bottom:1px solid #1a2733;display:flex;flex-direction:column;gap:6px">
+<aside class="lea-navigation" style="position:sticky;top:0;height:calc(100vh - 28px);display:flex;flex-direction:column;border-right:1px solid #475c70;background:#000">
+  <div style="padding:22px 20px 18px;border-bottom:1px solid #475c70;display:flex;flex-direction:column;gap:6px">
     <div style="display:flex;align-items:baseline;gap:10px">
       <span style="font:700 34px/1 'Rajdhani',sans-serif;letter-spacing:.18em;color:#00f0ff;text-shadow:0 0 14px rgba(0,240,255,.55)">LEA</span>
       <span style="font:500 10px/1 'JetBrains Mono',monospace;color:#ff2bd6">v0.8.2</span>
     </div>
-    <span style="font:400 10px/1.4 'JetBrains Mono',monospace;color:#6b7a8c">memória persistente<br>para agentes · self-hosted</span>
+    <span style="font:400 10px/1.4 'JetBrains Mono',monospace;color:#7e8c9b">memória persistente<br>para agentes · self-hosted</span>
   </div>
   <div style="padding:12px 10px 0">
-    <button sc-camel-on-click="{{ newSession }}" style="width:100%;display:flex;align-items:center;gap:8px;border:1px solid #00f0ff;cursor:pointer;background:rgba(0,240,255,.06);color:#00f0ff;font:700 13px/1 'Rajdhani',sans-serif;letter-spacing:.14em;padding:10px 12px;clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)"><span>+</span><span style="flex:1;text-align:left">NOVO AGENTE</span><span style="font:400 10px/1 'JetBrains Mono',monospace;color:#6b7a8c">⌘N</span></button>
+    <button sc-camel-on-click="{{ newSession }}" style="width:100%;display:flex;align-items:center;gap:8px;border:1px solid #00f0ff;cursor:pointer;background:rgba(0,240,255,.06);color:#00f0ff;font:700 13px/1 'Rajdhani',sans-serif;letter-spacing:.14em;padding:10px 12px;clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)"><span>+</span><span style="flex:1;text-align:left">NOVO AGENTE</span><span style="font:400 10px/1 'JetBrains Mono',monospace;color:#7e8c9b">⌘N</span></button>
   </div>
-  <nav style="display:flex;flex-direction:column;gap:12px;padding:12px 10px;border-bottom:1px solid #1a2733">
+  <nav style="display:flex;flex-direction:column;gap:12px;padding:12px 10px;border-bottom:1px solid #475c70">
     <sc-for list="{{ navGroups }}" as="g" hint-placeholder-count="3">
       <div style="display:flex;flex-direction:column;gap:1px">
-        <span style="padding:0 12px 5px;font:500 9.5px/1 'JetBrains Mono',monospace;letter-spacing:.16em;color:#4f5d6e">{{ g.label }}</span>
+        <span style="padding:0 12px 5px;font:500 9.5px/1 'JetBrains Mono',monospace;letter-spacing:.16em;color:#677b8e">{{ g.label }}</span>
         <sc-for list="{{ g.items }}" as="n" hint-placeholder-count="3">
         <div sc-camel-on-click="{{ n.go }}" style="display:flex;align-items:center;gap:10px;padding:7px 12px;cursor:pointer;color:{{ n.color }};background:{{ n.bg }};border-left:2px solid {{ n.bc }};text-shadow:{{ n.ts }}">
-        <span style="font:500 10px/1 'JetBrains Mono',monospace;color:#4f5d6e;width:16px">{{ n.num }}</span>
+        <span style="font:500 10px/1 'JetBrains Mono',monospace;color:#677b8e;width:16px">{{ n.num }}</span>
         <span style="font:600 13px/1 'Rajdhani',sans-serif;letter-spacing:.12em;flex:1">{{ n.label }}</span>
         <sc-if value="{{ n.hasBadge }}" hint-placeholder-val="{{ false }}">
           <span style="font:700 10px/1 'JetBrains Mono',monospace;padding:3px 5px;color:#0a0a0f;background:{{ n.badgeColor }}">{{ n.badge }}</span>
@@ -316,71 +476,71 @@ input::placeholder{color:#4f5d6e}
       </div>
     </sc-for>
   </nav>
-  <div style="flex:1;min-height:0;overflow:auto;padding:12px 10px 16px;display:flex;flex-direction:column;gap:14px">
+  <div class="lea-scroll" style="flex:1;min-height:0;overflow:auto;padding:12px 10px 16px;display:flex;flex-direction:column;gap:14px">
     <sc-for list="{{ threadGroups }}" as="g" hint-placeholder-count="3">
       <div style="display:flex;flex-direction:column;gap:1px">
-        <div style="display:flex;justify-content:space-between;padding:0 8px 6px;font:500 10px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:{{ g.color }}"><span>{{ g.label }}</span><span style="color:#4f5d6e">{{ g.count }}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:0 8px 6px;font:500 10px/1 'JetBrains Mono',monospace;letter-spacing:.1em;color:{{ g.color }}"><span>{{ g.label }}</span><span style="color:#677b8e">{{ g.count }}</span></div>
         <sc-for list="{{ g.items }}" as="t" hint-placeholder-count="3">
           <div sc-camel-on-click="{{ t.open }}" style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;background:{{ t.bg }};border-left:2px solid {{ t.bc }}">
             <span style="width:6px;height:6px;flex:none;background:{{ t.dot }};box-shadow:{{ t.glow }}"></span>
             <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
               <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:400 11px/1.2 'JetBrains Mono',monospace;color:{{ t.color }}">{{ t.title }}</span>
-              <span style="font:400 9.5px/1 'JetBrains Mono',monospace;color:#4f5d6e">{{ t.proj }} · {{ t.sLabel }}</span>
+              <span style="font:400 9.5px/1 'JetBrains Mono',monospace;color:#677b8e">{{ t.proj }} · {{ t.sLabel }}</span>
             </span>
             <span style="font:700 9px/1 'JetBrains Mono',monospace;color:{{ t.hColorSolid }}">{{ t.hCode }}</span>
           </div>
         </sc-for>
         <sc-if value="{{ g.hasHint }}" hint-placeholder-val="{{ false }}">
-          <span style="padding:4px 8px;font:400 9.5px/1.3 'JetBrains Mono',monospace;color:#4f5d6e">{{ g.hint }}</span>
+          <span style="padding:4px 8px;font:400 9.5px/1.3 'JetBrains Mono',monospace;color:#677b8e">{{ g.hint }}</span>
         </sc-if>
       </div>
     </sc-for>
   </div>
 </aside>
 
-<main style="min-width:0;display:flex;flex-direction:column">
-  <header style="display:flex;align-items:center;gap:18px;padding:18px 28px;border-bottom:1px solid #1a2733;background:#000;position:sticky;top:0;z-index:5">
+<main class="lea-main">
+  <header class="lea-head" style="display:flex;align-items:center;gap:18px;padding:18px 28px;border-bottom:1px solid #475c70;background:#000;position:sticky;top:0;z-index:5">
     <span style="font:500 11px/1 'JetBrains Mono',monospace;color:#ff2bd6">// {{ screenNum }}</span>
     <h1 style="margin:0;font:700 26px/1 'Rajdhani',sans-serif;letter-spacing:.14em;color:#e6edf3">{{ screenTitle }}</h1>
-    <span style="font:400 11px/1 'JetBrains Mono',monospace;color:#6b7a8c">{{ screenSub }}</span>
-    <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
-      <div style="display:flex;align-items:center;gap:10px;width:260px;padding:8px 12px;border:1px solid #1a2733;background:#000;color:#6b7a8c;font:400 11px/1 'JetBrains Mono',monospace;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)">
-        <span style="color:#00f0ff">⌕</span><span style="flex:1">buscar memória, skills, sessões…</span><span style="border:1px solid #2a3a48;padding:2px 5px;font-size:10px">⌘K</span>
+    <span class="lea-head-sub" style="font:400 11px/1 'JetBrains Mono',monospace;color:#7e8c9b">{{ screenSub }}</span>
+    <div class="lea-head-right" style="margin-left:auto;display:flex;align-items:center;gap:14px">
+      <div class="lea-search" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #475c70;background:#000;color:#7e8c9b;font:400 11px/1 'JetBrains Mono',monospace;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)">
+        <span style="color:#00f0ff">⌕</span><span style="flex:1">buscar memória, skills, sessões…</span><span style="border:1px solid #475c70;padding:2px 5px;font-size:10px">⌘K</span>
       </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+      <div class="lea-head-time" style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
         <span style="font:500 15px/1 'JetBrains Mono',monospace;color:#00f0ff;text-shadow:0 0 8px rgba(0,240,255,.5)">{{ clock }}</span>
-        <span style="font:400 10px/1 'JetBrains Mono',monospace;color:#6b7a8c">ter 27 out 2026 · BRT</span>
+        <span style="font:400 10px/1 'JetBrains Mono',monospace;color:#7e8c9b">ter 27 out 2026 · BRT</span>
       </div>
     </div>
   </header>
 
-  <div style="padding:24px 28px 56px;flex:1">
+  <div class="lea-main-body">
 
 <!-- 01 OVERVIEW -->
 <sc-if value="{{ isOverview }}" hint-placeholder-val="{{ true }}">
-<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 420px;gap:16px">
-  <div style="grid-column:1 / 4;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px">
+<div class="lea-overview">
+  <div class="lea-stats">
     <sc-for list="{{ stats }}" as="s" hint-placeholder-count="4">
-      <div sc-camel-on-click="{{ s.go }}" style="cursor:pointer;background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:10px;box-shadow:inset 0 0 30px rgba(0,240,255,.04)">
-        <div style="display:flex;justify-content:space-between;font:500 10.5px/1 'JetBrains Mono',monospace;color:#6b7a8c;letter-spacing:.06em"><span>┌─ {{ s.label }}</span><span>{{ s.id }}</span></div>
+      <div sc-camel-on-click="{{ s.go }}" style="cursor:pointer;background:#000;border:1px solid #475c70;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:10px;box-shadow:inset 0 0 30px rgba(0,240,255,.04)">
+        <div style="display:flex;justify-content:space-between;font:500 10.5px/1 'JetBrains Mono',monospace;color:#7e8c9b;letter-spacing:.06em"><span>┌─ {{ s.label }}</span><span>{{ s.id }}</span></div>
         <div style="display:flex;align-items:baseline;gap:8px">
           <span style="font:700 44px/1 'Rajdhani',sans-serif;color:{{ s.color }};text-shadow:0 0 16px {{ s.glow }}">{{ s.value }}</span>
-          <span style="font:400 11px/1 'JetBrains Mono',monospace;color:#6b7a8c">{{ s.unit }}</span>
+          <span style="font:400 11px/1 'JetBrains Mono',monospace;color:#7e8c9b">{{ s.unit }}</span>
         </div>
         <div style="display:flex;justify-content:space-between;font:400 11px/1 'JetBrains Mono',monospace"><span style="color:{{ s.color }}">{{ s.bar }}</span><span style="color:#8a99ab">{{ s.sub }}</span></div>
       </div>
     </sc-for>
   </div>
 
-  <section style="grid-column:1 / 3;background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px">
-    <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:12px"><span>┌─ AGENTES CONECTADOS ─┐</span><span style="color:#6b7a8c">refresh 1s · 6 harnesses</span></div>
-    <div style="display:grid;grid-template-columns:30px 1.3fr 88px 70px 1fr 160px 64px;gap:10px;padding:0 0 8px;border-bottom:1px solid #1a2733;font:500 10px/1 'JetBrains Mono',monospace;color:#4f5d6e;letter-spacing:.08em">
+  <section class="lea-agents" style="background:#000;border:1px solid #475c70;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px">
+    <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:12px"><span>┌─ AGENTES CONECTADOS ─┐</span><span style="color:#7e8c9b">refresh 1s · 6 harnesses</span></div>
+    <div class="lea-agents-row" style="padding:0 0 8px;border-bottom:1px solid #475c70;font:500 10px/1 'JetBrains Mono',monospace;color:#677b8e;letter-spacing:.08em">
       <span></span><span>AGENTE</span><span>STATUS</span><span>SESSÃO</span><span>PROJETO</span><span>CONTEXTO</span><span style="text-align:right">TOKENS</span>
     </div>
     <sc-for list="{{ agents }}" as="a" hint-placeholder-count="6">
-      <div sc-camel-on-click="{{ a.open }}" style="cursor:{{ a.cursor }};display:grid;grid-template-columns:30px 1.3fr 88px 70px 1fr 160px 64px;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #121b24;font:400 11.5px/1 'JetBrains Mono',monospace">
+      <div sc-camel-on-click="{{ a.open }}" class="lea-agents-row" style="cursor:{{ a.cursor }};align-items:center;padding:9px 0;border-bottom:1px solid #3c4d5d;font:400 11.5px/1 'JetBrains Mono',monospace">
         <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:18px;font:700 10px/1 'JetBrains Mono',monospace;color:{{ a.hColor }};background:{{ a.hBg }};border:1px solid {{ a.hBorder }}">{{ a.hCode }}</span>
-        <span style="display:flex;flex-direction:column;gap:3px"><span style="color:#e6edf3">{{ a.name }}</span><span style="font-size:10px;color:#6b7a8c">{{ a.host }}</span></span>
+        <span style="display:flex;flex-direction:column;gap:3px"><span style="color:#e6edf3">{{ a.name }}</span><span style="font-size:10px;color:#7e8c9b">{{ a.host }}</span></span>
         <span style="display:flex;align-items:center;gap:6px;color:{{ a.sColor }};font-size:10.5px"><span style="width:6px;height:6px;background:{{ a.sColor }};box-shadow:0 0 6px {{ a.sColor }}"></span>{{ a.sLabel }}</span>
         <span style="color:#ff2bd6">{{ a.session }}</span>
         <span style="color:#8a99ab">{{ a.project }}</span>
@@ -390,44 +550,44 @@ input::placeholder{color:#4f5d6e}
     </sc-for>
   </section>
 
-  <section style="grid-column:3;grid-row:2 / 4;background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;min-height:0">
+  <section class="lea-activity" style="background:#000;border:1px solid #475c70;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column">
     <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:12px"><span>┌─ ATIVIDADE ─┐</span><span style="display:flex;align-items:center;gap:6px;color:#39ff88"><span style="width:6px;height:6px;background:#39ff88;box-shadow:0 0 6px #39ff88"></span>AO VIVO</span></div>
-    <div style="display:flex;flex-direction:column;flex:1;overflow:hidden;max-height:560px">
+    <div class="lea-scroll lea-activity-list" style="display:flex;flex-direction:column">
       <sc-for list="{{ feed }}" as="f" hint-placeholder-count="12">
-        <div style="display:grid;grid-template-columns:62px 28px 74px 1fr;gap:8px;align-items:start;padding:7px 0;border-bottom:1px dashed #141e28;font:400 11px/1.45 'JetBrains Mono',monospace;animation:{{ f.anim }}">
-          <span style="color:#4f5d6e">{{ f.ts }}</span>
+        <div style="display:grid;grid-template-columns:62px 28px 74px 1fr;gap:8px;align-items:start;padding:7px 0;border-bottom:1px dashed #3c4d5d;font:400 11px/1.45 'JetBrains Mono',monospace;animation:{{ f.anim }}">
+          <span style="color:#677b8e">{{ f.ts }}</span>
           <span style="display:inline-flex;align-items:center;justify-content:center;height:16px;font:700 9.5px/1 'JetBrains Mono',monospace;color:{{ f.hColor }};background:{{ f.hBg }};border:1px solid {{ f.hBorder }}">{{ f.hCode }}</span>
           <span style="color:{{ f.tColor }};font-size:10px;letter-spacing:.04em">{{ f.type }}</span>
           <span style="color:#c4d0dc;word-break:break-word">{{ f.text }}</span>
         </div>
       </sc-for>
     </div>
-    <div style="margin-top:10px;padding-top:10px;border-top:1px solid #1a2733;font:400 11px/1 'JetBrains Mono',monospace;color:#6b7a8c;display:flex;gap:6px"><span style="color:#39ff88">lea@homelab</span><span>:~$ tail -f activity.log</span>{{ cursor }}</div>
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid #475c70;font:400 11px/1 'JetBrains Mono',monospace;color:#7e8c9b;display:flex;gap:6px"><span style="color:#39ff88">lea@homelab</span><span>:~$ tail -f activity.log</span>{{ cursor }}</div>
   </section>
 
-  <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:14px">
-    <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff"><span>┌─ TOKENS / HORA ─┐</span><span style="color:#6b7a8c">hoje</span></div>
+  <section class="lea-tokens" style="background:#000;border:1px solid #475c70;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff"><span>┌─ TOKENS / HORA ─┐</span><span style="color:#7e8c9b">hoje</span></div>
     <div style="display:flex;flex-direction:column;gap:4px">
       <span style="font:400 30px/1 'JetBrains Mono',monospace;color:#00f0ff;letter-spacing:1px;text-shadow:0 0 10px rgba(0,240,255,.45)">▁▁▁▁▁▁▂▃▅▆▇▅▃▄▆█</span>
-      <div style="display:flex;justify-content:space-between;font:400 9.5px/1 'JetBrains Mono',monospace;color:#4f5d6e"><span>00h</span><span>04h</span><span>08h</span><span>12h</span><span>agora</span></div>
+      <div style="display:flex;justify-content:space-between;font:400 9.5px/1 'JetBrains Mono',monospace;color:#677b8e"><span>00h</span><span>04h</span><span>08h</span><span>12h</span><span>agora</span></div>
     </div>
-    <div style="display:flex;flex-direction:column;gap:8px;padding-top:12px;border-top:1px solid #1a2733">
+    <div style="display:flex;flex-direction:column;gap:8px;padding-top:12px;border-top:1px solid #475c70">
       <sc-for list="{{ costs }}" as="c" hint-placeholder-count="4">
-        <div style="display:grid;grid-template-columns:28px 1fr 64px;gap:10px;align-items:center;font:400 11px/1 'JetBrains Mono',monospace">
+        <div class="lea-cost-row" style="gap:10px;align-items:center;font:400 11px/1 'JetBrains Mono',monospace">
           <span style="display:inline-flex;align-items:center;justify-content:center;height:16px;font:700 9.5px/1 'JetBrains Mono',monospace;color:{{ c.hColor }};background:{{ c.hBg }};border:1px solid {{ c.hBorder }}">{{ c.hCode }}</span>
           <span style="color:{{ c.barColor }}">{{ c.bar }}</span>
           <span style="text-align:right;color:#d7e3ee">{{ c.value }}</span>
         </div>
       </sc-for>
-      <div style="display:flex;justify-content:space-between;margin-top:4px;font:400 11px/1 'JetBrains Mono',monospace;color:#6b7a8c"><span>orçamento diário</span><span><span style="color:#e6edf3">R$ 18,42</span> / R$ 40,00</span></div>
+      <div style="display:flex;justify-content:space-between;margin-top:4px;font:400 11px/1 'JetBrains Mono',monospace;color:#7e8c9b"><span>orçamento diário</span><span><span style="color:#e6edf3">R$ 18,42</span> / R$ 40,00</span></div>
     </div>
   </section>
 
-  <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:4px">
+  <section class="lea-cron" style="background:#000;border:1px solid #475c70;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:4px">
     <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:8px"><span>┌─ PRÓXIMAS CRON ─┐</span><span sc-camel-on-click="{{ goAutomacoes }}" style="color:#ff2bd6;cursor:pointer">ver todas →</span></div>
     <sc-for list="{{ cronNext }}" as="c" hint-placeholder-count="4">
-      <div style="display:grid;grid-template-columns:52px 1fr auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #121b24;font:400 11px/1.4 'JetBrains Mono',monospace">
-        <span style="display:flex;flex-direction:column;gap:2px"><span style="color:#e6edf3">{{ c.time }}</span><span style="font-size:9.5px;color:#4f5d6e">{{ c.in }}</span></span>
+      <div style="display:grid;grid-template-columns:52px 1fr auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #3c4d5d;font:400 11px/1.4 'JetBrains Mono',monospace">
+        <span style="display:flex;flex-direction:column;gap:2px"><span style="color:#e6edf3">{{ c.time }}</span><span style="font-size:9.5px;color:#677b8e">{{ c.in }}</span></span>
         <span style="color:#c4d0dc">{{ c.title }}</span>
         <span style="font:500 9.5px/1 'JetBrains Mono',monospace;padding:3px 6px;border:1px solid {{ c.chColor }};color:{{ c.chColor }}">{{ c.channel }}</span>
       </div>
@@ -438,10 +598,10 @@ input::placeholder{color:#4f5d6e}
 
 <!-- 02 PROJETOS -->
 <sc-if value="{{ isProjetos }}" hint-placeholder-val="{{ false }}">
-<div style="display:grid;grid-template-columns:320px minmax(0,1fr);gap:16px;align-items:start">
-  <div style="display:flex;flex-direction:column;gap:10px">
+<div class="lea-projetos">
+  <div class="lea-proj-side">
     <div style="display:flex;justify-content:space-between;align-items:center;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:2px">
-      <span>┌─ PROJETOS ─┐</span><span style="color:#6b7a8c">{{ projCount }}</span>
+      <span>┌─ PROJETOS ─┐</span><span style="color:#7e8c9b">{{ projCount }}</span>
     </div>
     <sc-for list="{{ projList }}" as="p" hint-placeholder-count="5">
       <div sc-camel-on-click="{{ p.pick }}" style="cursor:pointer;background:#000;border:1px solid {{ p.border }};box-shadow:{{ p.shadow }};clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);padding:13px 14px;display:flex;flex-direction:column;gap:8px">
@@ -451,7 +611,7 @@ input::placeholder{color:#4f5d6e}
             <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:16px;font:700 9.5px/1 'JetBrains Mono',monospace;color:{{ b.hColor }};background:{{ b.hBg }};border:1px solid {{ b.hBorder }}">{{ b.hCode }}</span>
           </sc-for>
         </div>
-        <span style="font:400 10.5px/1 'JetBrains Mono',monospace;color:#6b7a8c">{{ p.path }} · {{ p.branch }}</span>
+        <span style="font:400 10.5px/1 'JetBrains Mono',monospace;color:#7e8c9b">{{ p.path }} · {{ p.branch }}</span>
         <div style="display:flex;gap:12px;font:400 10.5px/1 'JetBrains Mono',monospace">
           <span style="color:{{ p.activeColor }}">● {{ p.activeTxt }}</span>
           <span style="color:#8a99ab">{{ p.pages }} pág.</span>
@@ -462,9 +622,9 @@ input::placeholder{color:#4f5d6e}
     <button sc-camel-on-click="{{ openModal }}" style="cursor:pointer;background:transparent;color:#00f0ff;border:1px dashed #00f0ff;font:700 13px/1 'Rajdhani',sans-serif;letter-spacing:.14em;padding:13px">+ ABRIR PROJETO</button>
   </div>
 
-  <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
-    <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:18px 20px;display:flex;align-items:center;gap:18px">
-      <div style="display:flex;flex-direction:column;gap:8px;flex:1;min-width:0">
+  <div class="lea-proj-main">
+    <section class="lea-proj-head" style="background:#000;border:1px solid #475c70;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:18px 20px;display:flex;align-items:center;gap:18px">
+      <div class="lea-proj-id" style="display:flex;flex-direction:column;gap:8px;flex:1">
         <span style="font:700 30px/1 'Rajdhani',sans-serif;letter-spacing:.06em;color:#e6edf3">{{ P.id }}</span>
         <div style="display:flex;gap:14px;flex-wrap:wrap;font:400 11px/1 'JetBrains Mono',monospace;color:#8a99ab">
           <span>{{ P.path }}</span><span style="color:#00f0ff">{{ P.remote }}</span><span>⎇ {{ P.branch }}</span><span>{{ P.lang }}</span><span style="color:#ff2bd6">{{ P.commit }}</span>
@@ -472,26 +632,26 @@ input::placeholder{color:#4f5d6e}
       </div>
       <button sc-camel-on-click="{{ P.launchHere }}" style="border:0;cursor:pointer;background:#00f0ff;color:#0a0a0f;font:700 13px/1 'Rajdhani',sans-serif;letter-spacing:.14em;padding:10px 16px;clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)">▶ INICIAR AGENTE</button>
       <button sc-camel-on-click="{{ goMemoria }}" style="cursor:pointer;background:transparent;color:#00f0ff;border:1px solid #00f0ff;font:700 12px/1 'Rajdhani',sans-serif;letter-spacing:.14em;padding:9px 14px">ABRIR WIKI · {{ P.pages }}</button>
-      <button style="cursor:pointer;background:transparent;color:#8a99ab;border:1px solid #2a3a48;font:700 12px/1 'Rajdhani',sans-serif;letter-spacing:.14em;padding:9px 14px">CONFIGURAR</button>
+      <button style="cursor:pointer;background:transparent;color:#8a99ab;border:1px solid #475c70;font:700 12px/1 'Rajdhani',sans-serif;letter-spacing:.14em;padding:9px 14px">CONFIGURAR</button>
     </section>
 
-    <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px">
-      <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:10px"><span>┌─ AGENTES NESTE PROJETO ─┐</span><span style="color:#6b7a8c">controle ao vivo</span></div>
+    <section class="lea-proj-agents" style="background:#000;border:1px solid #475c70;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px">
+      <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:10px"><span>┌─ AGENTES NESTE PROJETO ─┐</span><span style="color:#7e8c9b">controle ao vivo</span></div>
       <sc-if value="{{ noRunning }}" hint-placeholder-val="{{ false }}">
-        <div style="padding:14px 0;font:400 11.5px/1.5 'JetBrains Mono',monospace;color:#6b7a8c">Nenhum agente rodando neste projeto. Use ▶ INICIAR AGENTE acima.</div>
+        <div style="padding:14px 0;font:400 11.5px/1.5 'JetBrains Mono',monospace;color:#7e8c9b">Nenhum agente rodando neste projeto. Use ▶ INICIAR AGENTE acima.</div>
       </sc-if>
       <sc-for list="{{ running }}" as="r" hint-placeholder-count="1">
-        <div style="display:grid;grid-template-columns:30px 150px 96px minmax(0,1fr) 150px 60px auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid #121b24;font:400 11.5px/1.3 'JetBrains Mono',monospace">
+        <div class="lea-run-row" style="align-items:center;padding:10px 0;border-bottom:1px solid #3c4d5d;font:400 11.5px/1.3 'JetBrains Mono',monospace">
           <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:18px;font:700 10px/1 'JetBrains Mono',monospace;color:{{ r.hColor }};background:{{ r.hBg }};border:1px solid {{ r.hBorder }}">{{ r.hCode }}</span>
           <span style="display:flex;flex-direction:column;gap:3px"><span style="color:#e6edf3">{{ r.agent }}</span><span style="color:#ff2bd6;font-size:10px">{{ r.id }} · {{ r.up }}</span></span>
           <span style="display:flex;align-items:center;gap:6px;color:{{ r.sColor }};font-size:10.5px"><span style="width:6px;height:6px;background:{{ r.sColor }};box-shadow:0 0 6px {{ r.sColor }}"></span>{{ r.status }}</span>
-          <span style="display:flex;flex-direction:column;gap:3px;min-width:0"><span style="color:#c4d0dc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.task }}</span><span style="color:#6b7a8c;font-size:10px">⎇ {{ r.branch }}</span></span>
+          <span style="display:flex;flex-direction:column;gap:3px;min-width:0"><span style="color:#c4d0dc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.task }}</span><span class="lea-nowrap" style="color:#7e8c9b;font-size:10px">⎇ {{ r.branch }}</span></span>
           <span style="color:#00f0ff">{{ r.ctxBar }}</span>
           <span style="color:#d7e3ee;text-align:right">{{ r.tokens }}</span>
           <div style="display:flex;gap:6px">
             <button sc-camel-on-click="{{ r.openConsole }}" style="cursor:pointer;background:transparent;color:#00f0ff;border:1px solid #00f0ff;font:600 10px/1 'JetBrains Mono',monospace;padding:6px 8px">CONSOLE</button>
-            <button sc-camel-on-click="{{ r.pause }}" style="cursor:pointer;background:transparent;color:#d7e3ee;border:1px solid #2a3a48;font:600 10px/1 'JetBrains Mono',monospace;padding:6px 8px"><sc-if value="{{ r.notPaused }}" hint-placeholder-val="{{ true }}">❚❚ PAUSAR</sc-if><sc-if value="{{ r.isPaused }}" hint-placeholder-val="{{ false }}">▶ RETOMAR</sc-if></button>
-            <button sc-camel-on-click="{{ r.stop }}" style="cursor:pointer;background:transparent;color:#f5ff3b;border:1px solid #4a4a1a;font:600 10px/1 'JetBrains Mono',monospace;padding:6px 8px">■ PARAR</button>
+            <button sc-camel-on-click="{{ r.pause }}" style="cursor:pointer;background:transparent;color:#d7e3ee;border:1px solid #475c70;font:600 10px/1 'JetBrains Mono',monospace;padding:6px 8px"><sc-if value="{{ r.notPaused }}" hint-placeholder-val="{{ true }}">❚❚ PAUSAR</sc-if><sc-if value="{{ r.isPaused }}" hint-placeholder-val="{{ false }}">▶ RETOMAR</sc-if></button>
+            <button sc-camel-on-click="{{ r.stop }}" style="cursor:pointer;background:transparent;color:#f5ff3b;border:1px solid #606123;font:600 10px/1 'JetBrains Mono',monospace;padding:6px 8px">■ PARAR</button>
           </div>
         </div>
       </sc-for>
@@ -503,42 +663,42 @@ input::placeholder{color:#4f5d6e}
 
 <!-- 03 MEMÓRIA -->
 <sc-if value="{{ isMemoria }}" hint-placeholder-val="{{ false }}">
-<div style="display:grid;grid-template-columns:250px minmax(0,1fr) 300px;gap:16px;height:calc(100vh - 168px);min-height:760px">
-  <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 12px;display:flex;flex-direction:column;gap:2px;overflow:auto">
-    <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin:0 4px 12px"><span>┌─ PROJETOS ─┐</span><span style="color:#6b7a8c">1.284</span></div>
+<div class="lea-memoria">
+  <section class="lea-scroll" style="background:#000;border:1px solid #475c70;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 12px;display:flex;flex-direction:column;gap:2px;overflow:auto">
+    <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin:0 4px 12px"><span>┌─ PROJETOS ─┐</span><span style="color:#7e8c9b">1.284</span></div>
     <sc-for list="{{ tree }}" as="t" hint-placeholder-count="14">
       <div sc-camel-on-click="{{ t.pick }}" style="display:flex;align-items:center;gap:6px;padding:6px 8px 6px {{ t.pad }};cursor:pointer;font:400 11.5px/1.2 'JetBrains Mono',monospace;color:{{ t.color }};background:{{ t.bg }};border-left:2px solid {{ t.bc }}">
-        <span style="color:{{ t.iconColor }};width:10px">{{ t.icon }}</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.label }}</span><span style="color:#4f5d6e;font-size:10px">{{ t.count }}</span>
+        <span style="color:{{ t.iconColor }};width:10px">{{ t.icon }}</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.label }}</span><span style="color:#677b8e;font-size:10px">{{ t.count }}</span>
       </div>
     </sc-for>
   </section>
 
-  <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);display:flex;flex-direction:column;min-height:0">
-    <div style="display:flex;align-items:center;gap:2px;padding:10px 16px 0;border-bottom:1px solid #1a2733">
+  <section style="background:#000;border:1px solid #475c70;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);display:flex;flex-direction:column;min-height:0">
+    <div style="display:flex;align-items:center;gap:2px;padding:10px 16px 0;border-bottom:1px solid #475c70">
       <sc-for list="{{ memTabs }}" as="tb" hint-placeholder-count="2">
         <button sc-camel-on-click="{{ tb.go }}" style="border:0;cursor:pointer;background:{{ tb.bg }};color:{{ tb.color }};font:700 13px/1 'Rajdhani',sans-serif;letter-spacing:.14em;padding:9px 16px;border-bottom:2px solid {{ tb.bc }}">{{ tb.label }}</button>
       </sc-for>
-      <span style="margin-left:auto;font:400 10.5px/1 'JetBrains Mono',monospace;color:#6b7a8c;padding-bottom:6px">lea-core/memoria/<span style="color:#e6edf3">decaimento-de-forca.md</span> · <span style="color:#ff2bd6">a3f9c12</span></span>
+      <span style="margin-left:auto;font:400 10.5px/1 'JetBrains Mono',monospace;color:#7e8c9b;padding-bottom:6px">lea-core/memoria/<span style="color:#e6edf3">decaimento-de-forca.md</span> · <span style="color:#ff2bd6">a3f9c12</span></span>
     </div>
     <sc-if value="{{ memPage }}" hint-placeholder-val="{{ true }}">
-      <article style="padding:28px 40px 40px;overflow:auto;flex:1;max-width:760px">
+      <article class="lea-scroll" style="padding:28px 40px 40px;overflow:auto;flex:1;max-width:760px">
         <div style="display:flex;gap:8px;margin-bottom:14px">
           <span style="font:500 10px/1 'JetBrains Mono',monospace;padding:3px 6px;border:1px solid #00f0ff;color:#00f0ff">TIER · WARM</span>
-          <span style="font:500 10px/1 'JetBrains Mono',monospace;padding:3px 6px;border:1px solid #2a3a48;color:#8a99ab">#memoria</span>
-          <span style="font:500 10px/1 'JetBrains Mono',monospace;padding:3px 6px;border:1px solid #2a3a48;color:#8a99ab">#arquitetura</span>
+          <span style="font:500 10px/1 'JetBrains Mono',monospace;padding:3px 6px;border:1px solid #475c70;color:#8a99ab">#memoria</span>
+          <span style="font:500 10px/1 'JetBrains Mono',monospace;padding:3px 6px;border:1px solid #475c70;color:#8a99ab">#arquitetura</span>
         </div>
         <h2 style="margin:0 0 14px;font:700 34px/1.05 'Rajdhani',sans-serif;letter-spacing:.02em;color:#e6edf3">Decaimento de força da memória</h2>
         <p style="margin:0 0 16px;font:400 13px/1.75 'JetBrains Mono',monospace;color:#c4d0dc;text-wrap:pretty">Cada página da wiki carrega um valor de <span style="color:#00f0ff">força</span> entre 0 e 1. A força cai com o tempo e sobe quando um agente lê ou cita a página. Páginas fracas saem do contexto injetado automaticamente, mas continuam no git.</p>
         <h3 style="margin:26px 0 10px;font:700 18px/1 'Rajdhani',sans-serif;letter-spacing:.1em;color:#ff2bd6">## FÓRMULA</h3>
-        <pre style="margin:0 0 16px;padding:14px 16px;background:#07080d;border:1px solid #1a2733;border-left:2px solid #00f0ff;font:400 12px/1.7 'JetBrains Mono',monospace;color:#d7e3ee;overflow:auto">forca = base * exp(-Δt / meia_vida)
+        <pre style="margin:0 0 16px;padding:14px 16px;background:#0f151b;border:1px solid #475c70;border-left:2px solid #00f0ff;font:400 12px/1.7 'JetBrains Mono',monospace;color:#d7e3ee;overflow:auto">forca = base * exp(-Δt / meia_vida)
       + 0.15 * acessos_7d
       + 0.30 * citado_em_handoff</pre>
         <h3 style="margin:26px 0 10px;font:700 18px/1 'Rajdhani',sans-serif;letter-spacing:.1em;color:#ff2bd6">## TIERS</h3>
-        <div style="display:grid;grid-template-columns:90px 110px 1fr;border:1px solid #1a2733;font:400 12px/1 'JetBrains Mono',monospace;margin-bottom:16px">
-          <span style="padding:9px 12px;background:#10141d;color:#6b7a8c;font-size:10.5px">TIER</span><span style="padding:9px 12px;background:#10141d;color:#6b7a8c;font-size:10.5px">MEIA-VIDA</span><span style="padding:9px 12px;background:#10141d;color:#6b7a8c;font-size:10.5px">COMPORTAMENTO</span>
-          <span style="padding:9px 12px;border-top:1px solid #1a2733;color:#ff2bd6">HOT</span><span style="padding:9px 12px;border-top:1px solid #1a2733">3 dias</span><span style="padding:9px 12px;border-top:1px solid #1a2733;color:#c4d0dc">sempre injetada no SessionStart</span>
-          <span style="padding:9px 12px;border-top:1px solid #1a2733;color:#00f0ff">WARM</span><span style="padding:9px 12px;border-top:1px solid #1a2733">21 dias</span><span style="padding:9px 12px;border-top:1px solid #1a2733;color:#c4d0dc">injetada se relevante ao projeto</span>
-          <span style="padding:9px 12px;border-top:1px solid #1a2733;color:#8a99ab">COLD</span><span style="padding:9px 12px;border-top:1px solid #1a2733">120 dias</span><span style="padding:9px 12px;border-top:1px solid #1a2733;color:#c4d0dc">só via busca explícita</span>
+        <div class="lea-tiers" style="border:1px solid #475c70;font:400 12px/1 'JetBrains Mono',monospace;margin-bottom:16px">
+          <span style="padding:9px 12px;background:#19222c;color:#7e8c9b;font-size:10.5px">TIER</span><span style="padding:9px 12px;background:#19222c;color:#7e8c9b;font-size:10.5px">MEIA-VIDA</span><span style="padding:9px 12px;background:#19222c;color:#7e8c9b;font-size:10.5px">COMPORTAMENTO</span>
+          <span style="padding:9px 12px;border-top:1px solid #475c70;color:#ff2bd6">HOT</span><span style="padding:9px 12px;border-top:1px solid #475c70">3 dias</span><span style="padding:9px 12px;border-top:1px solid #475c70;color:#c4d0dc">sempre injetada no SessionStart</span>
+          <span style="padding:9px 12px;border-top:1px solid #475c70;color:#00f0ff">WARM</span><span style="padding:9px 12px;border-top:1px solid #475c70">21 dias</span><span style="padding:9px 12px;border-top:1px solid #475c70;color:#c4d0dc">injetada se relevante ao projeto</span>
+          <span style="padding:9px 12px;border-top:1px solid #475c70;color:#8a99ab">COLD</span><span style="padding:9px 12px;border-top:1px solid #475c70">120 dias</span><span style="padding:9px 12px;border-top:1px solid #475c70;color:#c4d0dc">só via busca explícita</span>
         </div>
         <h3 style="margin:26px 0 10px;font:700 18px/1 'Rajdhani',sans-serif;letter-spacing:.1em;color:#ff2bd6">## REGRAS</h3>
         <ul style="margin:0;padding-left:18px;font:400 13px/1.85 'JetBrains Mono',monospace;color:#c4d0dc">
@@ -552,45 +712,45 @@ input::placeholder{color:#4f5d6e}
     <sc-if value="{{ memGraph }}" hint-placeholder-val="{{ false }}">
       <div style="flex:1;position:relative;min-height:0;background:radial-gradient(circle at 50% 50%,rgba(255,43,214,.06),transparent 60%)">
         {{ graph }}
-        <div style="position:absolute;left:16px;bottom:14px;display:flex;gap:16px;font:400 10.5px/1 'JetBrains Mono',monospace;color:#6b7a8c">
+        <div style="position:absolute;left:16px;bottom:14px;display:flex;gap:16px;font:400 10.5px/1 'JetBrains Mono',monospace;color:#7e8c9b">
           <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;background:#ff2bd6"></span>página atual</span>
           <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border:1px solid #00f0ff"></span>link direto</span>
-          <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border:1px solid #3a4a5a"></span>2º grau</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border:1px solid #4c6073"></span>2º grau</span>
         </div>
-        <div style="position:absolute;right:16px;bottom:14px;font:400 10.5px/1 'JetBrains Mono',monospace;color:#6b7a8c">17 nós · 24 arestas · profundidade 2</div>
+        <div style="position:absolute;right:16px;bottom:14px;font:400 10.5px/1 'JetBrains Mono',monospace;color:#7e8c9b">17 nós · 24 arestas · profundidade 2</div>
       </div>
     </sc-if>
   </section>
 
-  <aside style="display:flex;flex-direction:column;gap:16px;overflow:auto">
-    <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+  <aside class="lea-scroll lea-mem-aside">
+    <section style="background:#000;border:1px solid #475c70;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:10px">
       <div style="font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:2px">┌─ METADADOS ─┐</div>
-      <div style="display:flex;justify-content:space-between;font:400 11px/1 'JetBrains Mono',monospace"><span style="color:#6b7a8c">tier</span><span style="color:#00f0ff">WARM</span></div>
-      <div style="display:flex;justify-content:space-between;font:400 11px/1 'JetBrains Mono',monospace"><span style="color:#6b7a8c">último acesso</span><span>há 2h · claude-code</span></div>
-      <div style="display:flex;justify-content:space-between;font:400 11px/1 'JetBrains Mono',monospace"><span style="color:#6b7a8c">acessos 7d</span><span>14</span></div>
-      <div style="display:flex;justify-content:space-between;font:400 11px/1 'JetBrains Mono',monospace"><span style="color:#6b7a8c">id</span><span style="color:#ff2bd6">0x7a3f19</span></div>
-      <div style="display:flex;flex-direction:column;gap:6px;padding-top:10px;border-top:1px solid #1a2733">
-        <div style="display:flex;justify-content:space-between;font:400 11px/1 'JetBrains Mono',monospace"><span style="color:#6b7a8c">força</span><span style="color:#e6edf3">0.71</span></div>
-        <span style="font:400 14px/1 'JetBrains Mono',monospace;color:#00f0ff;text-shadow:0 0 8px rgba(0,240,255,.4)">▮▮▮▮▮▮▮<span style="color:#2a3a48">▮▮▮</span></span>
+      <div style="display:flex;justify-content:space-between;font:400 11px/1 'JetBrains Mono',monospace"><span style="color:#7e8c9b">tier</span><span style="color:#00f0ff">WARM</span></div>
+      <div style="display:flex;justify-content:space-between;font:400 11px/1 'JetBrains Mono',monospace"><span style="color:#7e8c9b">último acesso</span><span>há 2h · claude-code</span></div>
+      <div style="display:flex;justify-content:space-between;font:400 11px/1 'JetBrains Mono',monospace"><span style="color:#7e8c9b">acessos 7d</span><span>14</span></div>
+      <div style="display:flex;justify-content:space-between;font:400 11px/1 'JetBrains Mono',monospace"><span style="color:#7e8c9b">id</span><span style="color:#ff2bd6">0x7a3f19</span></div>
+      <div style="display:flex;flex-direction:column;gap:6px;padding-top:10px;border-top:1px solid #475c70">
+        <div style="display:flex;justify-content:space-between;font:400 11px/1 'JetBrains Mono',monospace"><span style="color:#7e8c9b">força</span><span style="color:#e6edf3">0.71</span></div>
+        <span style="font:400 14px/1 'JetBrains Mono',monospace;color:#00f0ff;text-shadow:0 0 8px rgba(0,240,255,.4)">▮▮▮▮▮▮▮<span style="color:#4c6277">▮▮▮</span></span>
         <span style="font:400 18px/1 'JetBrains Mono',monospace;color:#00f0ff;letter-spacing:1px">█▇▇▆▅▅▄▃▃▂▂▂▁▁▁</span>
-        <div style="display:flex;justify-content:space-between;font:400 9.5px/1 'JetBrains Mono',monospace;color:#4f5d6e"><span>agora</span><span>7d · 0.52</span><span>30d · 0.19</span></div>
+        <div style="display:flex;justify-content:space-between;font:400 9.5px/1 'JetBrains Mono',monospace;color:#677b8e"><span>agora</span><span>7d · 0.52</span><span>30d · 0.19</span></div>
       </div>
     </section>
-    <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:2px">
-      <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:8px"><span>┌─ VERSÕES GIT ─┐</span><span style="color:#6b7a8c">7</span></div>
+    <section style="background:#000;border:1px solid #475c70;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:2px">
+      <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:8px"><span>┌─ VERSÕES GIT ─┐</span><span style="color:#7e8c9b">7</span></div>
       <sc-for list="{{ versions }}" as="v" hint-placeholder-count="3">
-        <div style="display:flex;flex-direction:column;gap:4px;padding:8px 0;border-bottom:1px solid #121b24;font:400 11px/1.35 'JetBrains Mono',monospace">
-          <div style="display:flex;justify-content:space-between"><span style="color:#ff2bd6">{{ v.sha }}</span><span style="color:#4f5d6e">{{ v.when }}</span></div>
+        <div style="display:flex;flex-direction:column;gap:4px;padding:8px 0;border-bottom:1px solid #3c4d5d;font:400 11px/1.35 'JetBrains Mono',monospace">
+          <div style="display:flex;justify-content:space-between"><span style="color:#ff2bd6">{{ v.sha }}</span><span style="color:#677b8e">{{ v.when }}</span></div>
           <span style="color:#c4d0dc">{{ v.msg }}</span>
           <span style="color:{{ v.hColor }};font-size:10px">{{ v.agent }}</span>
         </div>
       </sc-for>
     </section>
-    <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:6px;font:400 11px/1.4 'JetBrains Mono',monospace">
+    <section style="background:#000;border:1px solid #475c70;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:6px;font:400 11px/1.4 'JetBrains Mono',monospace">
       <div style="font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:4px">┌─ LINKS ─┐</div>
-      <span style="color:#6b7a8c;font-size:10px">← ENTRADA (4)</span>
+      <span style="color:#7e8c9b;font-size:10px">← ENTRADA (4)</span>
       <span style="color:#ff2bd6">tiers-e-promocao</span><span style="color:#ff2bd6">formato-handoff</span><span style="color:#ff2bd6">decisoes/adr-07-decaimento</span><span style="color:#ff2bd6">consolidacao-noturna</span>
-      <span style="color:#6b7a8c;font-size:10px;margin-top:6px">→ SAÍDA (3)</span>
+      <span style="color:#7e8c9b;font-size:10px;margin-top:6px">→ SAÍDA (3)</span>
       <span style="color:#00f0ff">tiers-e-promocao</span><span style="color:#00f0ff">formato-handoff</span><span style="color:#00f0ff">hooks/session-start</span>
     </section>
   </aside>
@@ -599,9 +759,9 @@ input::placeholder{color:#4f5d6e}
 
 <!-- 03 SESSÕES & HANDOFFS -->
 <sc-if value="{{ isSessoes }}" hint-placeholder-val="{{ false }}">
-<div style="display:grid;grid-template-columns:minmax(0,1fr) 480px;gap:16px;align-items:start">
-  <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 18px">
-    <div style="display:flex;justify-content:space-between;align-items:center;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:14px">
+<div class="lea-sessoes">
+  <section style="background:#000;border:1px solid #475c70;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 18px">
+    <div class="lea-wrap" style="display:flex;justify-content:space-between;align-items:center;gap:10px;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:14px">
       <span>┌─ LINHA DO TEMPO ─┐</span>
       <div style="display:flex;gap:6px">
         <sc-for list="{{ sessFilters }}" as="sf" hint-placeholder-count="6">
@@ -609,42 +769,42 @@ input::placeholder{color:#4f5d6e}
         </sc-for>
       </div>
     </div>
-    <div style="font:600 12px/1 'Rajdhani',sans-serif;letter-spacing:.2em;color:#6b7a8c;padding:6px 0 12px">HOJE · 27 OUT 2026</div>
+    <div style="font:600 12px/1 'Rajdhani',sans-serif;letter-spacing:.2em;color:#7e8c9b;padding:6px 0 12px">HOJE · 27 OUT 2026</div>
     <sc-for list="{{ sessions }}" as="s" hint-placeholder-count="7">
       <div style="display:grid;grid-template-columns:48px 20px minmax(0,1fr);gap:10px">
-        <span style="font:400 11px/1 'JetBrains Mono',monospace;color:#6b7a8c;padding-top:14px;text-align:right">{{ s.t }}</span>
+        <span style="font:400 11px/1 'JetBrains Mono',monospace;color:#7e8c9b;padding-top:14px;text-align:right">{{ s.t }}</span>
         <div style="display:flex;flex-direction:column;align-items:center">
-          <span style="width:2px;height:12px;background:#1a2733"></span>
+          <span style="width:2px;height:12px;background:#475c70"></span>
           <span style="width:9px;height:9px;transform:rotate(45deg);background:{{ s.hColorSolid }};box-shadow:0 0 8px {{ s.hColorSolid }}"></span>
-          <span style="width:2px;flex:1;background:#1a2733"></span>
+          <span style="width:2px;flex:1;background:#475c70"></span>
         </div>
-        <div style="margin:6px 0;padding:11px 14px;border:1px solid #1a2733;background:#000;display:flex;flex-direction:column;gap:7px;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)">
-          <div style="display:flex;align-items:center;gap:10px;font:400 11px/1 'JetBrains Mono',monospace">
+        <div style="margin:6px 0;padding:11px 14px;border:1px solid #475c70;background:#000;display:flex;flex-direction:column;gap:7px;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)">
+          <div class="lea-wrap" style="display:flex;align-items:center;gap:10px;font:400 11px/1 'JetBrains Mono',monospace">
             <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:18px;font:700 10px/1 'JetBrains Mono',monospace;color:{{ s.hColor }};background:{{ s.hBg }};border:1px solid {{ s.hBorder }}">{{ s.hCode }}</span>
             <span style="color:#e6edf3">{{ s.agent }}</span>
             <span style="color:#ff2bd6">{{ s.id }}</span>
-            <span style="color:#6b7a8c">{{ s.project }} · {{ s.dur }}</span>
+            <span style="color:#7e8c9b">{{ s.project }} · {{ s.dur }}</span>
             <span style="margin-left:auto;font:500 9.5px/1 'JetBrains Mono',monospace;padding:3px 6px;border:1px solid {{ s.sColor }};color:{{ s.sColor }}">{{ s.sLabel }}</span>
           </div>
           <span style="font:400 12px/1.55 'JetBrains Mono',monospace;color:#c4d0dc">{{ s.summary }}</span>
-          <span style="font:400 10px/1 'JetBrains Mono',monospace;color:#4f5d6e">{{ s.meta }}</span>
+          <span style="font:400 10px/1 'JetBrains Mono',monospace;color:#677b8e">{{ s.meta }}</span>
         </div>
       </div>
     </sc-for>
   </section>
 
   <div style="display:flex;flex-direction:column;gap:14px">
-    <div style="display:flex;justify-content:space-between;align-items:baseline;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#ff2bd6"><span>┌─ HANDOFFS PENDENTES ─┐</span><span style="color:#6b7a8c">{{ pendingCount }} aguardando</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#ff2bd6"><span>┌─ HANDOFFS PENDENTES ─┐</span><span style="color:#7e8c9b">{{ pendingCount }} aguardando</span></div>
     <sc-for list="{{ handoffs }}" as="h" hint-placeholder-count="3">
       <article style="background:#000;border:1px solid {{ h.border }};clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px);padding:16px 18px;display:flex;flex-direction:column;gap:12px;box-shadow:{{ h.shadow }};opacity:{{ h.opacity }}">
-        <div style="display:flex;align-items:center;gap:10px;font:400 11px/1 'JetBrains Mono',monospace">
+        <div class="lea-wrap" style="display:flex;align-items:center;gap:10px;font:400 11px/1 'JetBrains Mono',monospace">
           <span style="color:#ff2bd6">{{ h.id }}</span>
-          <span style="color:#6b7a8c">de</span>
+          <span style="color:#7e8c9b">de</span>
           <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:18px;font:700 10px/1 'JetBrains Mono',monospace;color:{{ h.hColor }};background:{{ h.hBg }};border:1px solid {{ h.hBorder }}">{{ h.hCode }}</span>
           <span style="color:#e6edf3">{{ h.from }}</span>
-          <span style="margin-left:auto;color:#4f5d6e">{{ h.when }}</span>
+          <span style="margin-left:auto;color:#677b8e">{{ h.when }}</span>
         </div>
-        <div style="font:700 19px/1.1 'Rajdhani',sans-serif;letter-spacing:.04em;color:#e6edf3">{{ h.title }}<span style="font:400 11px/1 'JetBrains Mono',monospace;color:#6b7a8c;margin-left:10px">{{ h.project }}</span></div>
+        <div style="font:700 19px/1.1 'Rajdhani',sans-serif;letter-spacing:.04em;color:#e6edf3">{{ h.title }}<span style="font:400 11px/1 'JetBrains Mono',monospace;color:#7e8c9b;margin-left:10px">{{ h.project }}</span></div>
         <div style="display:flex;flex-direction:column;gap:4px">
           <span style="font:500 10px/1 'JetBrains Mono',monospace;color:#00f0ff;letter-spacing:.08em">▸ ONDE PAROU</span>
           <span style="font:400 11.5px/1.55 'JetBrains Mono',monospace;color:#c4d0dc">{{ h.stopped }}</span>
@@ -659,8 +819,8 @@ input::placeholder{color:#4f5d6e}
             <span style="font:400 11.5px/1.55 'JetBrains Mono',monospace;color:#c4d0dc">[ ] {{ o }}</span>
           </sc-for>
         </div>
-        <div style="display:flex;align-items:center;gap:10px;padding-top:12px;border-top:1px solid #1a2733">
-          <span style="font:400 10.5px/1 'JetBrains Mono',monospace;color:#6b7a8c">{{ h.pages }}</span>
+        <div style="display:flex;align-items:center;gap:10px;padding-top:12px;border-top:1px solid #475c70">
+          <span style="font:400 10.5px/1 'JetBrains Mono',monospace;color:#7e8c9b">{{ h.pages }}</span>
           <sc-if value="{{ h.isOpen }}" hint-placeholder-val="{{ true }}">
             <button sc-camel-on-click="{{ h.claim }}" style="margin-left:auto;border:0;cursor:pointer;background:#ff2bd6;color:#0a0a0f;font:700 13px/1 'Rajdhani',sans-serif;letter-spacing:.18em;padding:9px 18px;clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)">CLAIM ▸</button>
           </sc-if>
@@ -676,9 +836,9 @@ input::placeholder{color:#4f5d6e}
 
 <!-- 04 SKILLS -->
 <sc-if value="{{ isSkills }}" hint-placeholder-val="{{ false }}">
-<div style="display:flex;flex-direction:column;gap:16px">
-  <div style="display:flex;align-items:center;gap:24px">
-    <div style="display:flex;gap:28px;font:400 11px/1 'JetBrains Mono',monospace;color:#6b7a8c">
+<div class="lea-skills">
+  <div class="lea-skills-head">
+    <div style="display:flex;gap:28px;font:400 11px/1 'JetBrains Mono',monospace;color:#7e8c9b">
       <span><span style="font:700 26px/1 'Rajdhani',sans-serif;color:#e6edf3;margin-right:6px">47</span>skills</span>
       <span><span style="font:700 26px/1 'Rajdhani',sans-serif;color:#00f0ff;margin-right:6px">31</span>criadas pelo agente</span>
       <span><span style="font:700 26px/1 'Rajdhani',sans-serif;color:#8a99ab;margin-right:6px">16</span>manuais</span>
@@ -690,7 +850,7 @@ input::placeholder{color:#4f5d6e}
       </sc-for>
     </div>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px">
+  <div class="lea-skills-grid">
     <sc-for list="{{ skills }}" as="k" hint-placeholder-count="9">
       <article style="background:#000;border:1px solid {{ k.border }};clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:16px;display:flex;flex-direction:column;gap:12px;box-shadow:{{ k.shadow }}">
         <div style="display:flex;align-items:center;gap:8px">
@@ -704,7 +864,7 @@ input::placeholder{color:#4f5d6e}
           <span style="font:700 21px/1 'Rajdhani',sans-serif;letter-spacing:.04em;color:#e6edf3">{{ k.name }}</span>
           <span style="font:400 11px/1.5 'JetBrains Mono',monospace;color:#8a99ab">{{ k.desc }}</span>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:10px 0;border-top:1px solid #1a2733;border-bottom:1px solid #1a2733;font:400 10px/1 'JetBrains Mono',monospace;color:#6b7a8c">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:10px 0;border-top:1px solid #475c70;border-bottom:1px solid #475c70;font:400 10px/1 'JetBrains Mono',monospace;color:#7e8c9b">
           <span style="display:flex;flex-direction:column;gap:5px">usos<span style="font:500 14px/1 'JetBrains Mono',monospace;color:#e6edf3">{{ k.uses }}</span></span>
           <span style="display:flex;flex-direction:column;gap:5px">sucesso<span style="font:500 14px/1 'JetBrains Mono',monospace;color:#39ff88">{{ k.success }}</span></span>
           <span style="display:flex;flex-direction:column;gap:5px">30d<span style="font:400 14px/1 'JetBrains Mono',monospace;color:#00f0ff">{{ k.spark }}</span></span>
@@ -712,7 +872,7 @@ input::placeholder{color:#4f5d6e}
         <div style="display:flex;flex-direction:column;gap:5px">
           <sc-for list="{{ k.history }}" as="hi" hint-placeholder-count="2">
             <div style="display:grid;grid-template-columns:38px 1fr auto;gap:8px;font:400 10.5px/1.4 'JetBrains Mono',monospace">
-              <span style="color:{{ hi.color }}">v{{ hi.v }}</span><span style="color:#c4d0dc">{{ hi.msg }}</span><span style="color:#4f5d6e">{{ hi.when }}</span>
+              <span style="color:{{ hi.color }}">v{{ hi.v }}</span><span style="color:#c4d0dc">{{ hi.msg }}</span><span style="color:#677b8e">{{ hi.when }}</span>
             </div>
           </sc-for>
         </div>
@@ -724,21 +884,21 @@ input::placeholder{color:#4f5d6e}
 
 <!-- 05 AUTOMAÇÕES -->
 <sc-if value="{{ isAutomacoes }}" hint-placeholder-val="{{ false }}">
-<div style="display:flex;flex-direction:column;gap:16px">
-  <section style="background:#000;border:1px solid #00f0ff;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;align-items:center;gap:14px;box-shadow:inset 0 0 30px rgba(0,240,255,.07)">
+<div class="lea-auto">
+  <section class="lea-auto-new" style="background:#000;border:1px solid #00f0ff;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;align-items:center;gap:14px;box-shadow:inset 0 0 30px rgba(0,240,255,.07)">
     <span style="font:500 11px/1 'JetBrains Mono',monospace;color:#00f0ff;letter-spacing:.06em">┌─ NOVA ─┐</span>
     <span style="flex:1;font:400 13px/1 'JetBrains Mono',monospace;color:#e6edf3">dias úteis às 7h30, checa a fila de deploy e me avisa no slack se tiver algo travado{{ cursor }}</span>
-    <span style="font:400 11px/1 'JetBrains Mono',monospace;color:#6b7a8c">→ <span style="color:#ff2bd6">30 7 * * 1-5</span> · slack</span>
+    <span style="font:400 11px/1 'JetBrains Mono',monospace;color:#7e8c9b">→ <span style="color:#ff2bd6">30 7 * * 1-5</span> · slack</span>
     <button style="border:0;cursor:pointer;background:#00f0ff;color:#0a0a0f;font:700 13px/1 'Rajdhani',sans-serif;letter-spacing:.14em;padding:9px 16px;clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)">AGENDAR</button>
   </section>
 
-  <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px">
-    <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:12px"><span>┌─ TAREFAS AGENDADAS ─┐</span><span style="color:#6b7a8c">6 tarefas · 1 alerta · 1 pausada</span></div>
-    <div style="display:grid;grid-template-columns:minmax(0,1fr) 130px 130px 100px 200px;gap:14px;padding:0 10px 8px;border-bottom:1px solid #1a2733;font:500 10px/1 'JetBrains Mono',monospace;color:#4f5d6e;letter-spacing:.08em">
+  <section class="lea-auto-tasks" style="background:#000;border:1px solid #475c70;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px">
+    <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:12px"><span>┌─ TAREFAS AGENDADAS ─┐</span><span style="color:#7e8c9b">6 tarefas · 1 alerta · 1 pausada</span></div>
+    <div class="lea-cron-row" style="padding:0 10px 8px;border-bottom:1px solid #475c70;font:500 10px/1 'JetBrains Mono',monospace;color:#677b8e;letter-spacing:.08em">
       <span>INSTRUÇÃO</span><span>CRON</span><span>PRÓXIMA</span><span>CANAL</span><span>ÚLTIMA EXECUÇÃO</span>
     </div>
     <sc-for list="{{ crons }}" as="c" hint-placeholder-count="6">
-      <div sc-camel-on-click="{{ c.pick }}" style="display:grid;grid-template-columns:minmax(0,1fr) 130px 130px 100px 200px;gap:14px;align-items:center;padding:12px 10px;cursor:pointer;border-bottom:1px solid #121b24;background:{{ c.bg }};border-left:2px solid {{ c.bc }};font:400 11.5px/1.45 'JetBrains Mono',monospace">
+      <div sc-camel-on-click="{{ c.pick }}" class="lea-cron-row" style="align-items:center;padding:12px 10px;cursor:pointer;border-bottom:1px solid #3c4d5d;background:{{ c.bg }};border-left:2px solid {{ c.bc }};font:400 11.5px/1.45 'JetBrains Mono',monospace">
         <span style="color:{{ c.textColor }}">{{ c.text }}</span>
         <span style="color:#ff2bd6">{{ c.cron }}</span>
         <span style="color:#e6edf3">{{ c.next }}</span>
@@ -748,11 +908,11 @@ input::placeholder{color:#4f5d6e}
     </sc-for>
   </section>
 
-  <section style="background:#07080d;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 18px;display:flex;flex-direction:column;gap:4px">
-    <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:10px"><span>┌─ LOG · {{ selCron.id }} ─┐</span><span style="color:#6b7a8c">{{ selCron.lastFull }}</span></div>
+  <section style="background:#000;border:1px solid #475c70;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 18px;display:flex;flex-direction:column;gap:4px">
+    <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:10px"><span>┌─ LOG · {{ selCron.id }} ─┐</span><span style="color:#7e8c9b">{{ selCron.lastFull }}</span></div>
     <sc-for list="{{ selCron.log }}" as="l" hint-placeholder-count="6">
       <div style="display:grid;grid-template-columns:90px 60px 1fr;gap:10px;font:400 11.5px/1.6 'JetBrains Mono',monospace">
-        <span style="color:#4f5d6e">{{ l.ts }}</span><span style="color:{{ l.color }}">{{ l.lvl }}</span><span style="color:#c4d0dc">{{ l.msg }}</span>
+        <span style="color:#677b8e">{{ l.ts }}</span><span style="color:{{ l.color }}">{{ l.lvl }}</span><span style="color:#c4d0dc">{{ l.msg }}</span>
       </div>
     </sc-for>
   </section>
@@ -761,36 +921,36 @@ input::placeholder{color:#4f5d6e}
 
 <!-- 06 CONSOLE -->
 <sc-if value="{{ isConsole }}" hint-placeholder-val="{{ false }}">
-<div class="lea-console" style="display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;height:calc(100vh - 168px);min-height:760px">
-  <section style="background:#07080d;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);display:flex;flex-direction:column;min-height:0;position:relative">
-    <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #1a2733;position:relative">
+<div class="lea-console">
+  <section style="background:#000;border:1px solid #475c70;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);display:flex;flex-direction:column;min-height:0;position:relative">
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #475c70;position:relative">
       <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:18px;font:700 10px/1 'JetBrains Mono',monospace;color:{{ th.hColor }};background:{{ th.hBg }};border:1px solid {{ th.hBorder }}">{{ th.hCode }}</span>
       <span style="display:flex;flex-direction:column;gap:3px;min-width:0;max-width:340px">
         <span style="font:700 16px/1 'Rajdhani',sans-serif;letter-spacing:.06em;color:#e6edf3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ th.title }} ▾</span>
-        <span style="font:400 10px/1 'JetBrains Mono',monospace;color:#6b7a8c"><span style="color:#ff2bd6">{{ th.id }}</span> · {{ th.proj }} · <span style="color:{{ th.sColor }}">{{ th.sLabel }}</span></span>
+        <span style="font:400 10px/1 'JetBrains Mono',monospace;color:#7e8c9b"><span style="color:#ff2bd6">{{ th.id }}</span> · {{ th.proj }} · <span style="color:{{ th.sColor }}">{{ th.sLabel }}</span></span>
       </span>
       <div sc-camel-on-click="{{ toggleModel }}" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid #00f0ff;cursor:pointer;font:500 11px/1 'JetBrains Mono',monospace;color:#00f0ff">
-        <span style="color:#6b7a8c">model</span>{{ model }}<span>▾</span>
+        <span style="color:#7e8c9b">model</span>{{ model }}<span>▾</span>
       </div>
       <sc-if value="{{ modelOpen }}" hint-placeholder-val="{{ false }}">
         <div style="position:absolute;top:44px;left:170px;z-index:10;width:300px;background:#000;border:1px solid #00f0ff;box-shadow:0 10px 30px rgba(0,0,0,.6);display:flex;flex-direction:column">
           <sc-for list="{{ models }}" as="m" hint-placeholder-count="4">
             <div sc-camel-on-click="{{ m.pick }}" style="display:flex;justify-content:space-between;padding:9px 12px;cursor:pointer;background:{{ m.bg }};font:400 11px/1 'JetBrains Mono',monospace;color:#e6edf3" style-hover="background:#121a26">
-              <span>{{ m.name }}</span><span style="color:#6b7a8c">{{ m.meta }}</span>
+              <span>{{ m.name }}</span><span style="color:#7e8c9b">{{ m.meta }}</span>
             </div>
           </sc-for>
         </div>
       </sc-if>
-      <span style="margin-left:auto;font:400 11px/1 'JetBrains Mono',monospace;color:#6b7a8c">ctx <span style="color:#00f0ff">▮▮▮▮▯▯▯▯▯▯</span> 38.2k / 200k</span>
+      <span style="margin-left:auto;font:400 11px/1 'JetBrains Mono',monospace;color:#7e8c9b">ctx <span style="color:#00f0ff">▮▮▮▮▯▯▯▯▯▯</span> 38.2k / 200k</span>
     </div>
-    <div style="display:flex;align-items:center;gap:8px;padding:9px 16px;border-bottom:1px solid #1a2733;background:#000;font:400 10.5px/1 'JetBrains Mono',monospace;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:8px;padding:9px 16px;border-bottom:1px solid #475c70;background:#000;font:400 10.5px/1 'JetBrains Mono',monospace;flex-wrap:wrap">
       <span style="color:#ff2bd6">◆ memória injetada</span>
       <sc-for list="{{ injected }}" as="i" hint-placeholder-count="3">
-        <span style="padding:4px 7px;border:1px solid #3a1b37;color:#e6c3df;background:rgba(255,43,214,.06)">{{ i.slug }} <span style="color:#ff2bd6">{{ i.s }}</span></span>
+        <span style="padding:4px 7px;border:1px solid #863e81;color:#e6c3df;background:rgba(255,43,214,.06)">{{ i.slug }} <span style="color:#ff2bd6">{{ i.s }}</span></span>
       </sc-for>
-      <span style="color:#6b7a8c">+2</span>
+      <span style="color:#7e8c9b">+2</span>
     </div>
-    <div style="flex:1;overflow:auto;padding:18px 20px;display:flex;flex-direction:column;gap:14px">
+    <div class="lea-scroll" style="flex:1;overflow:auto;padding:18px 20px;display:flex;flex-direction:column;gap:14px">
       <sc-for list="{{ messages }}" as="m" hint-placeholder-count="5">
         <sc-if value="{{ m.isUser }}" hint-placeholder-val="{{ false }}">
           <div style="display:flex;gap:10px;font:400 13px/1.6 'JetBrains Mono',monospace"><span style="color:#39ff88;flex:none">rafa ❯</span><span style="color:#e6edf3">{{ m.text }}</span></div>
@@ -799,16 +959,16 @@ input::placeholder{color:#4f5d6e}
           <div style="margin-left:62px;display:flex;gap:8px;font:400 11.5px/1.5 'JetBrains Mono',monospace;animation:leaIn .3s ease-out"><span style="color:#39ff88;width:12px">{{ m.mark }}</span><span style="color:{{ m.color }}">{{ m.text }}</span></div>
         </sc-if>
         <sc-if value="{{ m.isTool }}" hint-placeholder-val="{{ false }}">
-          <div style="margin-left:62px;border:1px solid #1a2733;background:#000;font:400 11.5px/1.5 'JetBrains Mono',monospace">
+          <div style="margin-left:62px;border:1px solid #475c70;background:#000;font:400 11.5px/1.5 'JetBrains Mono',monospace">
             <div sc-camel-on-click="{{ m.toggle }}" style="display:flex;align-items:center;gap:10px;padding:7px 12px;cursor:pointer">
               <span style="color:#00f0ff;width:10px">{{ m.chev }}</span>
               <span style="color:#ff2bd6">{{ m.tool }}</span>
               <span style="color:#c4d0dc;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ m.args }}</span>
               <span style="color:{{ m.sColor }};font-size:10px">{{ m.result }}</span>
-              <span style="color:#4f5d6e;font-size:10px">{{ m.ms }}</span>
+              <span style="color:#677b8e;font-size:10px">{{ m.ms }}</span>
             </div>
             <sc-if value="{{ m.expanded }}" hint-placeholder-val="{{ false }}">
-              <pre style="margin:0;padding:10px 12px 10px 32px;border-top:1px dashed #1a2733;color:#8a99ab;font:400 11px/1.6 'JetBrains Mono',monospace;white-space:pre-wrap">{{ m.output }}</pre>
+              <pre style="margin:0;padding:10px 12px 10px 32px;border-top:1px dashed #475c70;color:#8a99ab;font:400 11px/1.6 'JetBrains Mono',monospace;white-space:pre-wrap">{{ m.output }}</pre>
             </sc-if>
           </div>
         </sc-if>
@@ -817,10 +977,10 @@ input::placeholder{color:#4f5d6e}
         </sc-if>
       </sc-for>
     </div>
-    <div style="position:relative;padding:12px 16px 14px;border-top:1px solid #1a2733">
+    <div style="position:relative;padding:12px 16px 14px;border-top:1px solid #475c70">
       <sc-if value="{{ showSlash }}" hint-placeholder-val="{{ false }}">
-        <div style="position:absolute;left:16px;bottom:62px;width:440px;background:#000;border:1px solid #00f0ff;box-shadow:0 -10px 30px rgba(0,0,0,.6);display:flex;flex-direction:column">
-          <div style="padding:7px 12px;font:500 10px/1 'JetBrains Mono',monospace;color:#6b7a8c;border-bottom:1px solid #1a2733;letter-spacing:.08em">COMANDOS · ↑↓ navegar · tab completar</div>
+        <div class="lea-slash" style="position:absolute;left:16px;bottom:62px;width:440px;background:#000;border:1px solid #00f0ff;box-shadow:0 -10px 30px rgba(0,0,0,.6);display:flex;flex-direction:column">
+          <div style="padding:7px 12px;font:500 10px/1 'JetBrains Mono',monospace;color:#7e8c9b;border-bottom:1px solid #475c70;letter-spacing:.08em">COMANDOS · ↑↓ navegar · tab completar</div>
           <sc-for list="{{ slashItems }}" as="c" hint-placeholder-count="5">
             <div sc-camel-on-click="{{ c.pick }}" style="display:grid;grid-template-columns:110px 1fr;gap:10px;padding:8px 12px;cursor:pointer;background:{{ c.bg }};font:400 11.5px/1.3 'JetBrains Mono',monospace">
               <span style="color:#00f0ff">{{ c.cmd }}</span><span style="color:#8a99ab">{{ c.desc }}</span>
@@ -829,11 +989,11 @@ input::placeholder{color:#4f5d6e}
         </div>
       </sc-if>
       <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border:1px solid #00f0ff;background:#000;box-shadow:inset 0 0 20px rgba(0,240,255,.06)">
-        <span style="color:#6b7a8c;font:400 16px/1 'JetBrains Mono',monospace;cursor:pointer" title="anexar arquivo ou página da wiki">+</span>
+        <span style="color:#7e8c9b;font:400 16px/1 'JetBrains Mono',monospace;cursor:pointer" title="anexar arquivo ou página da wiki">+</span>
         <span style="color:#39ff88;font:500 13px/1 'JetBrains Mono',monospace">❯</span>
-        <input value="{{ input }}" sc-camel-on-change="{{ onInput }}" sc-camel-on-key-down="{{ onKey }}" placeholder="fale com a lea ou digite / para comandos" style="flex:1;background:transparent;border:0;outline:none;color:#e6edf3;font:400 13px/1 'JetBrains Mono',monospace;caret-color:#00f0ff">
-        <span style="font:400 10px/1 'JetBrains Mono',monospace;color:#4f5d6e">⏎ enviar</span>
-        <span style="color:#8a99ab;font:400 10px/1 'JetBrains Mono',monospace;cursor:pointer;border:1px solid #2a3a48;padding:4px 6px" title="ditar">◉ MIC</span>
+        <input value="{{ input }}" sc-camel-on-change="{{ onInput }}" sc-camel-on-key-down="{{ onKey }}" placeholder="fale com a lea ou digite / para comandos" style="flex:1;min-width:0;background:transparent;border:0;outline:none;color:#e6edf3;font:400 13px/1 'JetBrains Mono',monospace;caret-color:#00f0ff">
+        <span style="font:400 10px/1 'JetBrains Mono',monospace;color:#677b8e">⏎ enviar</span>
+        <span style="color:#8a99ab;font:400 10px/1 'JetBrains Mono',monospace;cursor:pointer;border:1px solid #475c70;padding:4px 6px" title="ditar">◉ MIC</span>
         <sc-if value="{{ th.isLive }}" hint-placeholder-val="{{ true }}">
           <button title="interromper agente" style="width:26px;height:26px;border:1px solid #f5ff3b;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center"><span style="width:9px;height:9px;background:#f5ff3b"></span></button>
         </sc-if>
@@ -841,22 +1001,22 @@ input::placeholder{color:#4f5d6e}
     </div>
   </section>
 
-  <aside style="display:flex;flex-direction:column;gap:16px">
-    <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:9px;font:400 11px/1 'JetBrains Mono',monospace">
+  <aside class="lea-console-aside">
+    <section style="background:#000;border:1px solid #475c70;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:9px;font:400 11px/1 'JetBrains Mono',monospace">
       <div style="font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:3px">┌─ CONTEXTO ─┐</div>
-      <div style="display:flex;justify-content:space-between"><span style="color:#6b7a8c">system + tools</span><span>9.1k</span></div>
-      <div style="display:flex;justify-content:space-between"><span style="color:#6b7a8c">memória injetada</span><span style="color:#ff2bd6">6.4k</span></div>
-      <div style="display:flex;justify-content:space-between"><span style="color:#6b7a8c">conversa</span><span>22.7k</span></div>
-      <div style="display:flex;justify-content:space-between;padding-top:9px;border-top:1px solid #1a2733"><span style="color:#6b7a8c">custo da sessão</span><span style="color:#e6edf3">R$ 0,84</span></div>
-      <div style="display:flex;justify-content:space-between"><span style="color:#6b7a8c">compress em</span><span style="color:#f5ff3b">160k</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:#7e8c9b">system + tools</span><span>9.1k</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:#7e8c9b">memória injetada</span><span style="color:#ff2bd6">6.4k</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:#7e8c9b">conversa</span><span>22.7k</span></div>
+      <div style="display:flex;justify-content:space-between;padding-top:9px;border-top:1px solid #475c70"><span style="color:#7e8c9b">custo da sessão</span><span style="color:#e6edf3">R$ 0,84</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:#7e8c9b">compress em</span><span style="color:#f5ff3b">160k</span></div>
     </section>
-    <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:9px;font:400 11px/1.3 'JetBrains Mono',monospace">
+    <section style="background:#000;border:1px solid #475c70;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:9px;font:400 11px/1.3 'JetBrains Mono',monospace">
       <div style="font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:3px">┌─ SKILLS CARREGADAS ─┐</div>
       <div style="display:flex;justify-content:space-between"><span>backup-restic</span><span style="color:#ff2bd6">v1.2</span></div>
       <div style="display:flex;justify-content:space-between"><span>responder-telegram</span><span style="color:#ff2bd6">v1.5</span></div>
       <div style="display:flex;justify-content:space-between"><span>atualizar-memoria</span><span style="color:#ff2bd6">v2.0</span></div>
     </section>
-    <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:9px;font:400 11px/1.3 'JetBrains Mono',monospace">
+    <section style="background:#000;border:1px solid #475c70;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px;display:flex;flex-direction:column;gap:9px;font:400 11px/1.3 'JetBrains Mono',monospace">
       <div style="font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:3px">┌─ SUBAGENTES ─┐</div>
       <div style="display:flex;justify-content:space-between;align-items:center"><span>pesquisa-b2-locks</span><span style="color:#39ff88">concluído</span></div>
       <div style="display:flex;justify-content:space-between;align-items:center"><span>verificar-integridade</span><span style="color:#00f0ff">▮▮▮▮▮▮▯▯▯▯</span></div>
@@ -867,30 +1027,30 @@ input::placeholder{color:#4f5d6e}
 
 <!-- 07 CANAIS & AGENTES -->
 <sc-if value="{{ isCanais }}" hint-placeholder-val="{{ false }}">
-<div style="display:flex;flex-direction:column;gap:16px">
-  <section style="background:#000;border:1px solid #1a2733;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px">
+<div class="lea-canais">
+  <section class="lea-matrix lea-scroll" style="background:#000;border:1px solid #475c70;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 16px">
     <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:12px">
       <span>┌─ AGENTES DE CÓDIGO ─┐</span>
-      <span style="display:flex;gap:14px;color:#6b7a8c"><span><span style="color:#39ff88">●</span> ativo</span><span><span style="color:#f5ff3b">◐</span> erro</span><span><span style="color:#3a4a5a">○</span> não instalado</span></span>
+      <span style="display:flex;gap:14px;color:#7e8c9b"><span><span style="color:#39ff88">●</span> ativo</span><span><span style="color:#f5ff3b">◐</span> erro</span><span><span style="color:#4c6073">○</span> não instalado</span></span>
     </div>
-    <div style="display:grid;grid-template-columns:30px 170px 90px repeat(4,90px) 70px 90px 90px minmax(0,1fr);gap:10px;padding:0 0 8px;border-bottom:1px solid #1a2733;font:500 9.5px/1.3 'JetBrains Mono',monospace;color:#4f5d6e;letter-spacing:.06em">
+    <div class="lea-matrix-row" style="padding:0 0 8px;border-bottom:1px solid #475c70;font:500 9.5px/1.3 'JetBrains Mono',monospace;color:#677b8e;letter-spacing:.06em">
       <span></span><span>AGENTE</span><span>VERSÃO</span><span>SessionStart</span><span>PostToolUse</span><span>PreCompact</span><span>Stop</span><span>MCP</span><span>MEMÓRIA</span><span>HANDOFF</span><span>ÚLTIMO SINAL</span>
     </div>
     <sc-for list="{{ matrix }}" as="r" hint-placeholder-count="6">
-      <div style="display:grid;grid-template-columns:30px 170px 90px repeat(4,90px) 70px 90px 90px minmax(0,1fr);gap:10px;align-items:center;padding:11px 0;border-bottom:1px solid #121b24;font:400 11.5px/1 'JetBrains Mono',monospace">
+      <div class="lea-matrix-row" style="align-items:center;padding:11px 0;border-bottom:1px solid #3c4d5d;font:400 11.5px/1 'JetBrains Mono',monospace">
         <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:18px;font:700 10px/1 'JetBrains Mono',monospace;color:{{ r.hColor }};background:{{ r.hBg }};border:1px solid {{ r.hBorder }}">{{ r.hCode }}</span>
         <span style="color:#e6edf3">{{ r.name }}</span>
-        <span style="color:#6b7a8c">{{ r.ver }}</span>
+        <span style="color:#7e8c9b">{{ r.ver }}</span>
         <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="7">
-          <span style="color:{{ c.color }};font-size:13px;text-shadow:{{ c.ts }}">{{ c.g }}<span style="font-size:10px;margin-left:6px;color:#6b7a8c">{{ c.note }}</span></span>
+          <span style="color:{{ c.color }};font-size:13px;text-shadow:{{ c.ts }}">{{ c.g }}<span style="font-size:10px;margin-left:6px;color:#7e8c9b">{{ c.note }}</span></span>
         </sc-for>
         <span style="color:#8a99ab;font-size:10.5px">{{ r.last }}</span>
       </div>
     </sc-for>
   </section>
 
-  <div style="display:flex;justify-content:space-between;align-items:baseline;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#ff2bd6;margin-top:6px"><span>┌─ GATEWAY DE MENSAGENS ─┐</span><span style="color:#6b7a8c">lea-gateway v0.8.2 · :7420 · uptime 12d 04h</span></div>
-  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#ff2bd6;margin-top:6px"><span>┌─ GATEWAY DE MENSAGENS ─┐</span><span style="color:#7e8c9b">lea-gateway v0.8.2 · :7420 · uptime 12d 04h</span></div>
+  <div class="lea-platforms">
     <sc-for list="{{ platforms }}" as="p" hint-placeholder-count="4">
       <article style="background:#000;border:1px solid {{ p.border }};clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:16px;display:flex;flex-direction:column;gap:12px">
         <div style="display:flex;align-items:center;justify-content:space-between">
@@ -898,13 +1058,13 @@ input::placeholder{color:#4f5d6e}
           <span style="display:flex;align-items:center;gap:6px;font:500 10px/1 'JetBrains Mono',monospace;color:{{ p.sColor }}"><span style="width:6px;height:6px;background:{{ p.sColor }};box-shadow:0 0 6px {{ p.sColor }}"></span>{{ p.sLabel }}</span>
         </div>
         <span style="font:400 11px/1.4 'JetBrains Mono',monospace;color:#00f0ff">{{ p.handle }}</span>
-        <div style="display:flex;flex-direction:column;gap:7px;padding-top:10px;border-top:1px solid #1a2733;font:400 11px/1 'JetBrains Mono',monospace">
-          <div style="display:flex;justify-content:space-between"><span style="color:#6b7a8c">msgs 24h</span><span>{{ p.msgs }}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#6b7a8c">latência</span><span>{{ p.lat }}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:#6b7a8c">rotas</span><span>{{ p.routes }}</span></div>
+        <div style="display:flex;flex-direction:column;gap:7px;padding-top:10px;border-top:1px solid #475c70;font:400 11px/1 'JetBrains Mono',monospace">
+          <div style="display:flex;justify-content:space-between"><span style="color:#7e8c9b">msgs 24h</span><span>{{ p.msgs }}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#7e8c9b">latência</span><span>{{ p.lat }}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#7e8c9b">rotas</span><span>{{ p.routes }}</span></div>
         </div>
         <span style="font:400 10.5px/1.45 'JetBrains Mono',monospace;color:{{ p.noteColor }}">{{ p.note }}</span>
-        <button style="cursor:pointer;background:transparent;color:{{ p.btnColor }};border:1px solid {{ p.btnColor }};font:700 12px/1 'Rajdhani',sans-serif;letter-spacing:.14em;padding:8px 12px">{{ p.btn }}</button>
+        <button class="lea-push" style="cursor:pointer;background:transparent;color:{{ p.btnColor }};border:1px solid {{ p.btnColor }};font:700 12px/1 'Rajdhani',sans-serif;letter-spacing:.14em;padding:8px 12px">{{ p.btn }}</button>
       </article>
     </sc-for>
   </div>
@@ -914,23 +1074,23 @@ input::placeholder{color:#4f5d6e}
   </div>
   <sc-if value="{{ modal }}" hint-placeholder-val="{{ false }}">
     <div style="position:fixed;inset:0;z-index:40;background:rgba(5,6,10,.78);display:flex;align-items:center;justify-content:center">
-      <div style="width:560px;background:#000;border:1px solid #00f0ff;clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px);padding:20px 22px;display:flex;flex-direction:column;gap:16px;box-shadow:inset 0 0 40px rgba(0,240,255,.08)">
-        <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff"><span>┌─ ABRIR PROJETO ─┐</span><span sc-camel-on-click="{{ closeModal }}" style="cursor:pointer;color:#6b7a8c">✕ esc</span></div>
+      <div class="lea-modal-box" style="background:#000;border:1px solid #00f0ff;clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px);padding:20px 22px;display:flex;flex-direction:column;gap:16px;box-shadow:inset 0 0 40px rgba(0,240,255,.08)">
+        <div style="display:flex;justify-content:space-between;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff"><span>┌─ ABRIR PROJETO ─┐</span><span sc-camel-on-click="{{ closeModal }}" style="cursor:pointer;color:#7e8c9b">✕ esc</span></div>
         <div style="display:flex;flex-direction:column;gap:8px">
-          <span style="font:500 10px/1 'JetBrains Mono',monospace;color:#6b7a8c;letter-spacing:.08em">CAMINHO LOCAL OU GIT URL</span>
-          <input value="{{ npPath }}" sc-camel-on-change="{{ onNpPath }}" placeholder="~/code/meu-projeto ou github.com/rafa/repo" style="background:#07080d;border:1px solid #1a2733;color:#e6edf3;font:400 12.5px/1 'JetBrains Mono',monospace;padding:11px 12px;outline:none;caret-color:#00f0ff">
+          <span style="font:500 10px/1 'JetBrains Mono',monospace;color:#7e8c9b;letter-spacing:.08em">CAMINHO LOCAL OU GIT URL</span>
+          <input value="{{ npPath }}" sc-camel-on-change="{{ onNpPath }}" placeholder="~/code/meu-projeto ou github.com/rafa/repo" style="background:#0f151b;border:1px solid #475c70;color:#e6edf3;font:400 12.5px/1 'JetBrains Mono',monospace;padding:11px 12px;outline:none;caret-color:#00f0ff">
         </div>
         <div style="display:flex;flex-direction:column;gap:8px">
-          <span style="font:500 10px/1 'JetBrains Mono',monospace;color:#6b7a8c;letter-spacing:.08em">NOME NA WIKI</span>
-          <input value="{{ npName }}" sc-camel-on-change="{{ onNpName }}" placeholder="gerado a partir da pasta" style="background:#07080d;border:1px solid #1a2733;color:#e6edf3;font:400 12.5px/1 'JetBrains Mono',monospace;padding:11px 12px;outline:none;caret-color:#00f0ff">
+          <span style="font:500 10px/1 'JetBrains Mono',monospace;color:#7e8c9b;letter-spacing:.08em">NOME NA WIKI</span>
+          <input value="{{ npName }}" sc-camel-on-change="{{ onNpName }}" placeholder="gerado a partir da pasta" style="background:#0f151b;border:1px solid #475c70;color:#e6edf3;font:400 12.5px/1 'JetBrains Mono',monospace;padding:11px 12px;outline:none;caret-color:#00f0ff">
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;font:400 11.5px/1.3 'JetBrains Mono',monospace;color:#c4d0dc">
           <span><span style="color:#00f0ff">▣</span> criar seção na wiki e indexar README, docs/ e ADRs</span>
           <span><span style="color:#00f0ff">▣</span> instalar hooks nos agentes detectados (claude-code, codex, cursor)</span>
-          <span><span style="color:#4f5d6e">□</span> permitir que a lea rode tarefas autônomas neste projeto</span>
+          <span><span style="color:#677b8e">□</span> permitir que a lea rode tarefas autônomas neste projeto</span>
         </div>
-        <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:14px;border-top:1px solid #1a2733">
-          <button sc-camel-on-click="{{ closeModal }}" style="cursor:pointer;background:transparent;color:#8a99ab;border:1px solid #2a3a48;font:700 12px/1 'Rajdhani',sans-serif;letter-spacing:.14em;padding:10px 16px">CANCELAR</button>
+        <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:14px;border-top:1px solid #475c70">
+          <button sc-camel-on-click="{{ closeModal }}" style="cursor:pointer;background:transparent;color:#8a99ab;border:1px solid #475c70;font:700 12px/1 'Rajdhani',sans-serif;letter-spacing:.14em;padding:10px 16px">CANCELAR</button>
           <button sc-camel-on-click="{{ addProject }}" style="border:0;cursor:pointer;background:#00f0ff;color:#0a0a0f;font:700 13px/1 'Rajdhani',sans-serif;letter-spacing:.14em;padding:10px 18px;clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)">ABRIR PROJETO</button>
         </div>
       </div>
@@ -938,30 +1098,30 @@ input::placeholder{color:#4f5d6e}
   </sc-if>
 </main>
 <aside class="lea-avatar-panel" aria-label="Avatar LEA">
-    <section style="background:#000;border:1px solid #1a2733;padding:12px;font:400 11px/1.4 'JetBrains Mono',monospace">
-      <div style="display:flex;justify-content:space-between;color:#00f0ff;letter-spacing:.06em;margin-bottom:8px"><span>┌─ AVATAR LEA ─┐</span><span style="color:#8a99ab">PRÉVIA</span></div>
+    <section style="background:#000;border:1px solid #475c70;padding:12px;font:400 11px/1.4 'JetBrains Mono',monospace">
+      <div style="display:flex;justify-content:space-between;color:#00f0ff;letter-spacing:.06em;margin-bottom:8px"><span>┌─ AGENT LEA ─┐</span></div>
       <lea-avatar id="lea-face" style="height:470px"></lea-avatar>
       <lea-waveform avatar="#lea-face" style="height:104px;margin-top:6px"></lea-waveform>
     </section>
 </aside>
 <sc-if value="{{ launcher }}" hint-placeholder-val="{{ false }}">
   <div style="position:fixed;inset:0;z-index:40;background:rgba(5,6,10,.82);display:flex;align-items:center;justify-content:center">
-    <div style="width:900px;max-height:calc(100vh - 80px);overflow:auto;background:#000;border:1px solid #00f0ff;clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px);padding:20px 24px 22px;display:flex;flex-direction:column;gap:20px;box-shadow:inset 0 0 50px rgba(0,240,255,.07)">
-      <div style="display:flex;justify-content:space-between;align-items:center"><span style="font:700 24px/1 'Rajdhani',sans-serif;letter-spacing:.14em;color:#00f0ff;text-shadow:0 0 12px rgba(0,240,255,.5)">NOVO AGENTE</span><span sc-camel-on-click="{{ closeLauncher }}" style="cursor:pointer;font:400 11px/1 'JetBrains Mono',monospace;color:#6b7a8c">✕ esc</span></div>
+    <div class="lea-scroll lea-launcher-box" style="overflow:auto;background:#000;border:1px solid #00f0ff;clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px);padding:20px 24px 22px;display:flex;flex-direction:column;gap:20px;box-shadow:inset 0 0 50px rgba(0,240,255,.07)">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span style="font:700 24px/1 'Rajdhani',sans-serif;letter-spacing:.14em;color:#00f0ff;text-shadow:0 0 12px rgba(0,240,255,.5)">NOVO AGENTE</span><span sc-camel-on-click="{{ closeLauncher }}" style="cursor:pointer;font:400 11px/1 'JetBrains Mono',monospace;color:#7e8c9b">✕ esc</span></div>
       <div style="display:flex;flex-direction:column;gap:10px">
-        <div style="display:flex;align-items:center;gap:10px"><span style="font:700 11px/1 'JetBrains Mono',monospace;color:#0a0a0f;background:#00f0ff;padding:3px 5px">01</span><span style="font:700 15px/1 'Rajdhani',sans-serif;letter-spacing:.14em;color:#e6edf3">PROJETO</span><span style="font:400 10.5px/1 'JetBrains Mono',monospace;color:#6b7a8c">onde o agente vai trabalhar</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font:700 11px/1 'JetBrains Mono',monospace;color:#0a0a0f;background:#00f0ff;padding:3px 5px">01</span><span style="font:700 15px/1 'Rajdhani',sans-serif;letter-spacing:.14em;color:#e6edf3">PROJETO</span><span style="font:400 10.5px/1 'JetBrains Mono',monospace;color:#7e8c9b">onde o agente vai trabalhar</span></div>
         <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px">
           <sc-for list="{{ projOpts }}" as="p" hint-placeholder-count="5">
             <button sc-camel-on-click="{{ p.pick }}" style="cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:10px 12px;text-align:left;background:{{ p.bg }};border:1px solid {{ p.bc }}">
               <span style="font:700 15px/1 'Rajdhani',sans-serif;letter-spacing:.06em;color:{{ p.color }}">{{ p.id }}</span>
-              <span style="font:400 9.5px/1 'JetBrains Mono',monospace;color:#6b7a8c">{{ p.path }}</span>
+              <span style="font:400 9.5px/1 'JetBrains Mono',monospace;color:#7e8c9b">{{ p.path }}</span>
               <span style="font:400 9.5px/1 'JetBrains Mono',monospace;color:{{ p.hoColor }}">{{ p.hoTxt }}</span>
             </button>
           </sc-for>
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:10px">
-        <div style="display:flex;align-items:center;gap:10px"><span style="font:700 11px/1 'JetBrains Mono',monospace;color:#0a0a0f;background:#00f0ff;padding:3px 5px">02</span><span style="font:700 15px/1 'Rajdhani',sans-serif;letter-spacing:.14em;color:#e6edf3">AGENTE</span><span style="font:400 10.5px/1 'JetBrains Mono',monospace;color:#6b7a8c">qual harness vai rodar</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font:700 11px/1 'JetBrains Mono',monospace;color:#0a0a0f;background:#00f0ff;padding:3px 5px">02</span><span style="font:700 15px/1 'Rajdhani',sans-serif;letter-spacing:.14em;color:#e6edf3">AGENTE</span><span style="font:400 10.5px/1 'JetBrains Mono',monospace;color:#7e8c9b">qual harness vai rodar</span></div>
         <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px">
           <sc-for list="{{ agentOpts }}" as="a" hint-placeholder-count="5">
             <button sc-camel-on-click="{{ a.pick }}" style="cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:10px 12px;background:{{ a.bg }};color:{{ a.color }};border:1px solid {{ a.bc }}">
@@ -973,7 +1133,7 @@ input::placeholder{color:#4f5d6e}
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:10px">
-        <div style="display:flex;align-items:center;gap:10px"><span style="font:700 11px/1 'JetBrains Mono',monospace;color:#0a0a0f;background:#00f0ff;padding:3px 5px">03</span><span style="font:700 15px/1 'Rajdhani',sans-serif;letter-spacing:.14em;color:#e6edf3">MODO</span><span style="font:400 10.5px/1 'JetBrains Mono',monospace;color:#6b7a8c">como você quer acompanhar</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font:700 11px/1 'JetBrains Mono',monospace;color:#0a0a0f;background:#00f0ff;padding:3px 5px">03</span><span style="font:700 15px/1 'Rajdhani',sans-serif;letter-spacing:.14em;color:#e6edf3">MODO</span><span style="font:400 10.5px/1 'JetBrains Mono',monospace;color:#7e8c9b">como você quer acompanhar</span></div>
         <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
           <sc-for list="{{ modes }}" as="m" hint-placeholder-count="3">
             <div sc-camel-on-click="{{ m.pick }}" style="cursor:pointer;display:flex;flex-direction:column;gap:6px;padding:10px 12px;border:1px solid {{ m.border }};background:{{ m.bg }}">
@@ -984,45 +1144,45 @@ input::placeholder{color:#4f5d6e}
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:10px">
-        <div style="display:flex;align-items:center;gap:10px"><span style="font:700 11px/1 'JetBrains Mono',monospace;color:#0a0a0f;background:#00f0ff;padding:3px 5px">04</span><span style="font:700 15px/1 'Rajdhani',sans-serif;letter-spacing:.14em;color:#e6edf3">TAREFA</span><span style="font:400 10.5px/1 'JetBrains Mono',monospace;color:#6b7a8c">o que fazer e com qual memória</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font:700 11px/1 'JetBrains Mono',monospace;color:#0a0a0f;background:#00f0ff;padding:3px 5px">04</span><span style="font:700 15px/1 'Rajdhani',sans-serif;letter-spacing:.14em;color:#e6edf3">TAREFA</span><span style="font:400 10.5px/1 'JetBrains Mono',monospace;color:#7e8c9b">o que fazer e com qual memória</span></div>
         <div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px">
           <div style="display:flex;flex-direction:column;gap:8px">
-            <textarea value="{{ lTask }}" sc-camel-on-change="{{ onTask }}" placeholder="descreva o que o agente deve fazer…" style="min-height:104px;resize:vertical;background:#07080d;border:1px solid #1a2733;color:#e6edf3;font:400 12px/1.6 'JetBrains Mono',monospace;padding:10px 12px;outline:none;caret-color:#00f0ff"></textarea>
+            <textarea class="lea-scroll" value="{{ lTask }}" sc-camel-on-change="{{ onTask }}" placeholder="descreva o que o agente deve fazer…" style="min-height:104px;resize:vertical;background:#0f151b;border:1px solid #475c70;color:#e6edf3;font:400 12px/1.6 'JetBrains Mono',monospace;padding:10px 12px;outline:none;caret-color:#00f0ff"></textarea>
             <div style="display:flex;align-items:center;gap:10px">
               <span sc-camel-on-click="{{ toggleWt }}" style="cursor:pointer;display:flex;align-items:center;gap:6px;font:400 11px/1 'JetBrains Mono',monospace;color:#c4d0dc"><span style="color:{{ wtColor }};font-size:13px">{{ wtMark }}</span>worktree isolada</span>
-              <div style="flex:1;display:flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid #1a2733;background:#07080d;opacity:{{ branchOpacity }}">
-                <span style="color:#6b7a8c;font-size:11px">⎇</span>
+              <div style="flex:1;display:flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid #475c70;background:#0f151b;opacity:{{ branchOpacity }}">
+                <span style="color:#7e8c9b;font-size:11px">⎇</span>
                 <input value="{{ lBranch }}" sc-camel-on-change="{{ onBranch }}" style="flex:1;background:transparent;border:0;outline:none;color:#e6edf3;font:400 11.5px/1 'JetBrains Mono',monospace">
               </div>
             </div>
           </div>
           <div style="display:flex;flex-direction:column;gap:8px">
-            <div style="display:flex;justify-content:space-between;font:500 10px/1 'JetBrains Mono',monospace;color:#6b7a8c;letter-spacing:.08em"><span>MEMÓRIA INJETADA</span><span style="color:#ff2bd6">{{ memSummary }}</span></div>
-            <div style="display:flex;flex-direction:column;border:1px solid #1a2733;background:#07080d">
+            <div style="display:flex;justify-content:space-between;font:500 10px/1 'JetBrains Mono',monospace;color:#7e8c9b;letter-spacing:.08em"><span>MEMÓRIA INJETADA</span><span style="color:#ff2bd6">{{ memSummary }}</span></div>
+            <div style="display:flex;flex-direction:column;border:1px solid #475c70;background:#0f151b">
               <sc-for list="{{ memRows }}" as="m" hint-placeholder-count="3">
-                <div sc-camel-on-click="{{ m.toggle }}" style="cursor:pointer;display:grid;grid-template-columns:16px minmax(0,1fr) 36px 36px;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid #121b24;font:400 11px/1.2 'JetBrains Mono',monospace">
+                <div sc-camel-on-click="{{ m.toggle }}" style="cursor:pointer;display:grid;grid-template-columns:16px minmax(0,1fr) 36px 36px;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid #3c4d5d;font:400 11px/1.2 'JetBrains Mono',monospace">
                   <span style="color:{{ m.color }};font-size:13px">{{ m.mark }}</span>
                   <span style="color:{{ m.textColor }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ m.slug }}</span>
                   <span style="color:#00f0ff;text-align:right">{{ m.s }}</span>
-                  <span style="color:#6b7a8c;text-align:right">{{ m.tk }}</span>
+                  <span style="color:#7e8c9b;text-align:right">{{ m.tk }}</span>
                 </div>
               </sc-for>
             </div>
           </div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:14px;padding-top:16px;border-top:1px solid #1a2733">
+      <div style="display:flex;align-items:center;gap:14px;padding-top:16px;border-top:1px solid #475c70">
         <div style="flex:1;display:flex;flex-direction:column;gap:5px;font:400 11px/1.3 'JetBrains Mono',monospace">
           <span style="color:#e6edf3">{{ launchSummary }}</span>
-          <span style="color:#6b7a8c">{{ launchNext }}</span>
+          <span style="color:#7e8c9b">{{ launchNext }}</span>
         </div>
-        <button sc-camel-on-click="{{ closeLauncher }}" style="cursor:pointer;background:transparent;color:#8a99ab;border:1px solid #2a3a48;font:700 12px/1 'Rajdhani',sans-serif;letter-spacing:.14em;padding:11px 16px">CANCELAR</button>
+        <button sc-camel-on-click="{{ closeLauncher }}" style="cursor:pointer;background:transparent;color:#8a99ab;border:1px solid #475c70;font:700 12px/1 'Rajdhani',sans-serif;letter-spacing:.14em;padding:11px 16px">CANCELAR</button>
         <button sc-camel-on-click="{{ launch }}" style="border:0;cursor:pointer;background:#00f0ff;color:#0a0a0f;font:700 15px/1 'Rajdhani',sans-serif;letter-spacing:.18em;padding:12px 24px;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px)">▶ INICIAR</button>
       </div>
     </div>
   </div>
 </sc-if>
-<footer style="position:fixed;left:0;bottom:0;width:1440px;height:28px;z-index:30;display:flex;align-items:center;gap:18px;padding:0 16px;box-sizing:border-box;background:#000;border-top:1px solid #1a2733;font:400 10.5px/1 'JetBrains Mono',monospace;color:#6b7a8c">
+<footer class="lea-footer" style="position:fixed;left:0;right:0;bottom:0;height:28px;z-index:30;display:flex;align-items:center;gap:18px;padding:0 16px;box-sizing:border-box;background:#000;border-top:1px solid #475c70;font:400 10.5px/1 'JetBrains Mono',monospace;color:#7e8c9b">
   <span style="display:flex;align-items:center;gap:6px;color:#39ff88"><span style="width:6px;height:6px;background:#39ff88;box-shadow:0 0 6px #39ff88"></span>gateway pronto :7420</span>
   <span sc-camel-on-click="{{ goProjetos }}" style="cursor:pointer;color:#00f0ff">◌ {{ runningCount }} agentes rodando</span>
   <span sc-camel-on-click="{{ goAutomacoes }}" style="cursor:pointer">◷ cron 14:30 · certificados TLS</span>
@@ -1039,14 +1199,14 @@ input::placeholder{color:#4f5d6e}
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script="" data-props="{&quot;scanlines&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Efeitos&quot;},&quot;liveFeed&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Efeitos&quot;},&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;overview&quot;,&quot;options&quot;:[&quot;overview&quot;,&quot;projetos&quot;,&quot;memoria&quot;,&quot;sessoes&quot;,&quot;skills&quot;,&quot;automacoes&quot;,&quot;console&quot;,&quot;canais&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Navegação&quot;}}">
-const C={cyan:'#00f0ff',mag:'#ff2bd6',yel:'#f5ff3b',grn:'#39ff88',vio:'#9b8cff',wht:'#e6edf3',mut:'#6b7a8c',off:'#4a5666'};
+const C={cyan:'#00f0ff',mag:'#ff2bd6',yel:'#f5ff3b',grn:'#39ff88',vio:'#9b8cff',wht:'#e6edf3',mut:'#7e8c9b',off:'#677b8e'};
 const HS={
   CC:{hCode:'CC',hColor:C.mag,hBg:'transparent',hBorder:C.mag,hColorSolid:C.mag,name:'claude-code'},
   CX:{hCode:'CX',hColor:C.cyan,hBg:'transparent',hBorder:C.cyan,hColorSolid:C.cyan,name:'codex'},
   GM:{hCode:'GM',hColor:C.vio,hBg:'transparent',hBorder:C.vio,hColorSolid:C.vio,name:'gemini-cli'},
   CR:{hCode:'CR',hColor:C.wht,hBg:'transparent',hBorder:C.wht,hColorSolid:C.wht,name:'cursor'},
   LE:{hCode:'LE',hColor:'#0a0a0f',hBg:C.cyan,hBorder:C.cyan,hColorSolid:C.cyan,name:'lea-agent'},
-  AD:{hCode:'AD',hColor:'#8a99ab',hBg:'transparent',hBorder:'#3a4a5a',hColorSolid:'#8a99ab',name:'aider'}
+  AD:{hCode:'AD',hColor:'#8a99ab',hBg:'transparent',hBorder:'#4c6073',hColorSolid:'#8a99ab',name:'aider'}
 };
 const h=k=>({...HS[k]});
 const ST={ONLINE:C.grn,OCIOSO:C.mut,OFFLINE:C.off,ALERTA:C.yel,ATIVA:C.grn,ENCERRADA:C.mut,HANDOFF:C.mag,OK:C.grn,PAUSADA:C.mut,ERRO:C.yel,RECONECTANDO:C.yel,INICIANDO:C.cyan};
@@ -1184,9 +1344,9 @@ class Component extends DCLogic {
       ['cliente-acme','▸',0,'342','p'],['infra-homelab','▸',0,'96','p'],['site-portfolio','▸',0,'41','p'],['pessoal','▸',0,'77','p'],['_global','▸',0,'12','p']
     ];
     const tree=treeRaw.map(t=>{const sel=t[4]===s.treeSel;return {label:t[0],icon:t[1],count:t[3],pad:(8+t[2]*14)+'px',
-      color:sel?C.wht:(t[2]===0?'#d7e3ee':'#8a99ab'),bg:sel?'rgba(255,43,214,.08)':'transparent',bc:sel?C.mag:'transparent',iconColor:sel?C.mag:(t[2]===0?C.cyan:'#4f5d6e'),
+      color:sel?C.wht:(t[2]===0?'#d7e3ee':'#8a99ab'),bg:sel?'rgba(255,43,214,.08)':'transparent',bc:sel?C.mag:'transparent',iconColor:sel?C.mag:(t[2]===0?C.cyan:'#677b8e'),
       pick:()=>{if(t[4].length>1)set({treeSel:t[4]})}}});
-    const memTabs=[['page','PÁGINA'],['graph','GRAFO']].map(t=>{const a=s.memTab===t[0];return {label:t[1],go:()=>set({memTab:t[0]}),bg:a?'rgba(0,240,255,.06)':'transparent',color:a?C.cyan:'#6b7a8c',bc:a?C.cyan:'transparent'}});
+    const memTabs=[['page','PÁGINA'],['graph','GRAFO']].map(t=>{const a=s.memTab===t[0];return {label:t[1],go:()=>set({memTab:t[0]}),bg:a?'rgba(0,240,255,.06)':'transparent',color:a?C.cyan:'#7e8c9b',bc:a?C.cyan:'transparent'}});
     const versions=[
       {sha:'a3f9c12',when:'há 2h',msg:'ajusta meia-vida do tier warm para 21d',agent:'claude-code',hColor:C.mag},
       {sha:'9e1b4d0',when:'ontem 23:00',msg:'consolida notas de 3 sessões',agent:'lea-agent',hColor:C.cyan},
@@ -1201,14 +1361,14 @@ class Component extends DCLogic {
     const edges=[[0,1],[0,2],[0,3],[0,4],[0,5],[0,6],[1,8],[1,7],[4,7],[4,14],[2,9],[2,10],[5,10],[5,15],[3,11],[3,12],[6,13],[6,16],[1,5],[2,3],[4,6],[11,12],[8,15],[9,10]];
     const E=React.createElement;
     const graph=E('svg',{viewBox:'0 0 800 600',style:{position:'absolute',inset:0,width:'100%',height:'100%'}},
-      E('defs',null,E('pattern',{id:'g',width:24,height:24,patternUnits:'userSpaceOnUse'},E('circle',{cx:1,cy:1,r:.8,fill:'#1a2733'}))),
+      E('defs',null,E('pattern',{id:'g',width:24,height:24,patternUnits:'userSpaceOnUse'},E('circle',{cx:1,cy:1,r:.8,fill:'#273b4c'}))),
       E('rect',{width:800,height:600,fill:'url(#g)'}),
       ...edges.map((e,i)=>{const a=nodes[e[0]],b=nodes[e[1]],d=e[0]===0;return E('line',{key:'e'+i,x1:a[1],y1:a[2],x2:b[1],y2:b[2],stroke:d?C.mag:C.cyan,strokeOpacity:d?.6:.22,strokeWidth:d?1.2:1,strokeDasharray:d?'none':'3 4'})}),
-      ...nodes.map((n,i)=>{const cur=n[4]==='cur',d=n[4]==='d';const col=cur?C.mag:d?C.cyan:'#3a4a5a';
+      ...nodes.map((n,i)=>{const cur=n[4]==='cur',d=n[4]==='d';const col=cur?C.mag:d?C.cyan:'#4c6073';
         return E('g',{key:'n'+i},
           cur?E('circle',{cx:n[1],cy:n[2],r:24,fill:'none',stroke:C.mag,strokeOpacity:.3}):null,
           E('rect',{x:n[1]-n[3],y:n[2]-n[3],width:n[3]*2,height:n[3]*2,transform:`rotate(45 ${n[1]} ${n[2]})`,fill:cur?C.mag:'#0a0a0f',stroke:col,strokeWidth:1.4,style:{filter:cur||d?`drop-shadow(0 0 6px ${col})`:'none'}}),
-          E('text',{x:n[1],y:n[2]+n[3]+16,textAnchor:'middle',fill:cur?C.wht:d?'#c4d0dc':'#6b7a8c',style:{font:`${cur?600:400} ${cur?12:10}px 'JetBrains Mono',monospace`}},n[0]))}));
+          E('text',{x:n[1],y:n[2]+n[3]+16,textAnchor:'middle',fill:cur?C.wht:d?'#c4d0dc':'#7e8c9b',style:{font:`${cur?600:400} ${cur?12:10}px 'JetBrains Mono',monospace`}},n[0]))}));
 
     // sessões
     const sessRaw=[
@@ -1237,7 +1397,7 @@ class Component extends DCLogic {
         open:['Implementar fila com backoff no cliente','Ou subir o limite só para SessionStart'],pages:'cita 4 páginas · sugerido: codex'}
     ];
     const handoffs=hoRaw.map(x=>{const c=s.claimed[x.id];return {...h(x.k),...x,isOpen:!c,isClaimed:!!c,claimedBy:'ASSUMIDO POR CLAUDE-CODE · '+(c||''),
-      border:c?'#1a2733':C.mag,shadow:c?'none':'inset 0 0 40px rgba(255,43,214,.07)',opacity:c?.55:1,claim:()=>openL(x.project,{'hf-0x3e7a':'CC','hf-0x3e61':'LE','hf-0x3e58':'CX'}[x.id],'handoff')}});
+      border:c?'#475c70':C.mag,shadow:c?'none':'inset 0 0 40px rgba(255,43,214,.07)',opacity:c?.55:1,claim:()=>openL(x.project,{'hf-0x3e7a':'CC','hf-0x3e61':'LE','hf-0x3e58':'CX'}[x.id],'handoff')}});
 
     // skills
     const skRaw=[
@@ -1254,9 +1414,9 @@ class Component extends DCLogic {
     const sf=s.skillFilter;
     const skills=skRaw.filter(k=>sf==='Todas'||(sf==='Automáticas'&&k.o==='AUTO')||(sf==='Manuais'&&k.o==='MANUAL')||(sf==='Evoluídas'&&k.ev)).map(k=>({
       name:k.name,version:k.v,origin:k.o==='AUTO'?'◆ CRIADA PELO AGENTE':'✎ MANUAL',originColor:k.o==='AUTO'?C.cyan:'#8a99ab',evolved:!!k.ev,evolvedWhen:k.ev,desc:k.d,uses:k.u,success:k.sc,spark:k.sp,
-      border:k.ev?C.mag:'#1a2733',shadow:k.ev?'inset 0 0 40px rgba(255,43,214,.09)':'none',
-      history:k.hist.map((x,i)=>({v:x[0],msg:x[1],when:x[2],color:i===0&&k.ev?C.mag:'#6b7a8c'}))}));
-    const skillFilters=['Todas','Automáticas','Manuais','Evoluídas'].map(k=>{const a=sf===k;return {label:k.toUpperCase(),go:()=>set({skillFilter:k}),bg:a?C.cyan:'transparent',color:a?'#0a0a0f':C.cyan,bc:a?C.cyan:'#1f3a48'}});
+      border:k.ev?C.mag:'#475c70',shadow:k.ev?'inset 0 0 40px rgba(255,43,214,.09)':'none',
+      history:k.hist.map((x,i)=>({v:x[0],msg:x[1],when:x[2],color:i===0&&k.ev?C.mag:'#7e8c9b'}))}));
+    const skillFilters=['Todas','Automáticas','Manuais','Evoluídas'].map(k=>{const a=sf===k;return {label:k.toUpperCase(),go:()=>set({skillFilter:k}),bg:a?C.cyan:'transparent',color:a?'#0a0a0f':C.cyan,bc:a?C.cyan:'#325f6f'}});
 
     // automações
     const cr=[
@@ -1273,8 +1433,8 @@ class Component extends DCLogic {
       {id:'cron-06',text:'Dia 1 de cada mês, me lembra de pagar a fatura da VPS',cron:'0 10 1 * *',next:'—',channel:'WHATSAPP',s:'PAUSADA',last:'01/10 · 2s',
         log:[['—','INFO','pausada por rafa em 15/10: "migrei pro homelab"']]}
     ];
-    const LV={INFO:'#6b7a8c',TOOL:C.cyan,SEND:C.grn,OK:C.grn,WARN:C.yel,SKILL:C.mag};
-    const crons=cr.map((c,i)=>{const a=s.cronSel===i;return {...c,...st(c.s),chColor:CH[c.channel],pick:()=>set({cronSel:i}),bg:a?'rgba(0,240,255,.05)':'transparent',bc:a?C.cyan:'transparent',textColor:c.s==='PAUSADA'?'#6b7a8c':'#e6edf3'}});
+    const LV={INFO:'#7e8c9b',TOOL:C.cyan,SEND:C.grn,OK:C.grn,WARN:C.yel,SKILL:C.mag};
+    const crons=cr.map((c,i)=>{const a=s.cronSel===i;return {...c,...st(c.s),chColor:CH[c.channel],pick:()=>set({cronSel:i}),bg:a?'rgba(0,240,255,.05)':'transparent',bc:a?C.cyan:'transparent',textColor:c.s==='PAUSADA'?'#7e8c9b':'#e6edf3'}});
     const sc=cr[s.cronSel];
     const selCron={id:sc.id,lastFull:sc.last,log:sc.log.map(l=>({ts:l[0],lvl:l[1],msg:l[2],color:LV[l[1]]}))};
 
@@ -1305,8 +1465,8 @@ class Component extends DCLogic {
     const live=s.projects.flatMap(p=>p.running.map(r=>({id:r.id,k:r.k,proj:p.id,title:r.task,status:r.status,up:r.up,tokens:r.tokens})));
     const allT=[...live,...DONE];
     const thrItem=t=>{const a=s.screen==='console'&&s.thread===t.id;const sc=ST[t.status]||C.mut;const on=t.status==='ATIVA'||t.status==='INICIANDO';
-      return {...h(t.k),...t,sLabel:t.status.toLowerCase(),dot:on?sc:t.status==='HANDOFF'?C.mag:'#3a4a5a',glow:on?'0 0 6px '+sc:'none',
-        color:a?C.wht:on?'#c4d0dc':'#6b7a8c',bg:a?'rgba(0,240,255,.07)':'transparent',bc:a?C.cyan:'transparent',
+      return {...h(t.k),...t,sLabel:t.status.toLowerCase(),dot:on?sc:t.status==='HANDOFF'?C.mag:'#4c6073',glow:on?'0 0 6px '+sc:'none',
+        color:a?C.wht:on?'#c4d0dc':'#7e8c9b',bg:a?'rgba(0,240,255,.07)':'transparent',bc:a?C.cyan:'transparent',
         open:e=>{if(e&&e.shiftKey){set({pins:{...s.pins,[t.id]:!s.pins[t.id]}})}else set({screen:'console',thread:t.id,extraMsgs:[]})}}};
     const isRun=t=>['ATIVA','INICIANDO','PAUSADA'].includes(t.status);
     const waiting=t=>t.status==='HANDOFF'&&t.ho&&!s.claimed[t.ho];
@@ -1315,7 +1475,7 @@ class Component extends DCLogic {
       {label:'◆ FIXADOS',color:C.mag,items:allT.filter(t=>s.pins[t.id]).map(thrItem),hint:'⇧ + clique para fixar',always:true},
       {label:'● RODANDO',color:C.grn,items:rest.filter(isRun).map(thrItem),hint:'nenhum agente rodando'},
       {label:'◇ AGUARDANDO VOCÊ',color:C.mag,items:rest.filter(waiting).map(thrItem),hint:'nenhum handoff pendente'},
-      {label:'○ RECENTES',color:'#6b7a8c',items:rest.filter(t=>!isRun(t)&&!waiting(t)).map(thrItem)}
+      {label:'○ RECENTES',color:'#7e8c9b',items:rest.filter(t=>!isRun(t)&&!waiting(t)).map(thrItem)}
     ].map(g=>({...g,count:g.items.length,hasHint:!!g.hint&&(g.always||g.items.length===0)}));
     const curT=allT.find(t=>t.id===s.thread)||allT[0];
     const th={...h(curT.k),...st(curT.status),...curT,sLabel:curT.status,sColor:ST[curT.status]||C.mut,isLive:curT.status==='ATIVA'||curT.status==='INICIANDO'};
@@ -1340,12 +1500,12 @@ class Component extends DCLogic {
     }
     const q=s.input.trim();
     const showSlash=q.startsWith('/')&&!q.includes(' ');
-    const slashItems=SLASH.filter(c=>c[0].startsWith(q)).map((c,i)=>({cmd:c[0],desc:c[1],bg:i===0?'rgba(0,240,255,.08)':'transparent',pick:()=>set({input:c[0]+' '})}));
-    const models=MODELS.map(m=>({name:m[0],meta:m[1],bg:m[0]===s.model?'rgba(0,240,255,.08)':'transparent',pick:()=>set({model:m[0],modelOpen:false})}));
+    const slashItems=SLASH.filter(c=>c[0].startsWith(q)).map((c,i)=>({cmd:c[0],desc:c[1],bg:i===0?'rgba(0,240,255,.16)':'transparent',pick:()=>set({input:c[0]+' '})}));
+    const models=MODELS.map(m=>({name:m[0],meta:m[1],bg:m[0]===s.model?'rgba(0,240,255,.16)':'transparent',pick:()=>set({model:m[0],modelOpen:false})}));
     const injected=[{slug:'infra-homelab/backup-restic',s:'0.82'},{slug:'handoff/hf-0x3e61',s:'0.90'},{slug:'_global/preferencias-rafa',s:'0.95'}];
 
     // canais
-    const G={on:{g:'●',color:C.grn,ts:'0 0 6px '+C.grn},err:{g:'◐',color:C.yel,ts:'0 0 6px '+C.yel},off:{g:'○',color:'#3a4a5a',ts:'none'}};
+    const G={on:{g:'●',color:C.grn,ts:'0 0 6px '+C.grn},err:{g:'◐',color:C.yel,ts:'0 0 6px '+C.yel},off:{g:'○',color:'#4c6073',ts:'none'}};
     const cell=(k,note='')=>({...G[k],note});
     const matrix=[
       {...h('CC'),name:'claude-code',ver:'2.1.4',cells:[cell('on'),cell('on'),cell('on'),cell('on'),cell('on'),cell('on','R/W'),cell('on')],last:'há 1s'},
@@ -1356,17 +1516,17 @@ class Component extends DCLogic {
       {...h('AD'),name:'aider',ver:'0.86',cells:[cell('err','timeout'),cell('off'),cell('off'),cell('off'),cell('off'),cell('on','R'),cell('off')],last:'há 3d'}
     ];
     const platforms=[
-      {name:'TELEGRAM',...st('ONLINE'),handle:'@lea_rafa_bot',msgs:'142',lat:'210ms',routes:'DM · 2 grupos',note:'última: "lembra de renovar o domínio" · 13:58',noteColor:'#8a99ab',btn:'CONFIGURAR',btnColor:C.cyan,border:'#1a2733'},
-      {name:'DISCORD',...st('ONLINE'),handle:'homelab · #lea · #alertas',msgs:'58',lat:'95ms',routes:'2 canais',note:'resumo das PRs entregue · 08:00',noteColor:'#8a99ab',btn:'CONFIGURAR',btnColor:C.cyan,border:'#1a2733'},
-      {name:'SLACK',...st('ONLINE'),handle:'acme-dev · #infra · #custos',msgs:'23',lat:'180ms',routes:'2 canais · 1 DM',note:'alerta de certificado enviado · 13:30',noteColor:'#8a99ab',btn:'CONFIGURAR',btnColor:C.cyan,border:'#1a2733'},
-      {name:'WHATSAPP',...st('RECONECTANDO'),handle:'+55 11 9••••-4021',msgs:'9',lat:'—',routes:'DM',note:'sessão expirou às 13:40. Escaneie o QR code para reconectar.',noteColor:C.yel,btn:'GERAR QR CODE',btnColor:C.yel,border:'#4a4a1a'}
+      {name:'TELEGRAM',...st('ONLINE'),handle:'@lea_rafa_bot',msgs:'142',lat:'210ms',routes:'DM · 2 grupos',note:'última: "lembra de renovar o domínio" · 13:58',noteColor:'#8a99ab',btn:'CONFIGURAR',btnColor:C.cyan,border:'#475c70'},
+      {name:'DISCORD',...st('ONLINE'),handle:'homelab · #lea · #alertas',msgs:'58',lat:'95ms',routes:'2 canais',note:'resumo das PRs entregue · 08:00',noteColor:'#8a99ab',btn:'CONFIGURAR',btnColor:C.cyan,border:'#475c70'},
+      {name:'SLACK',...st('ONLINE'),handle:'acme-dev · #infra · #custos',msgs:'23',lat:'180ms',routes:'2 canais · 1 DM',note:'alerta de certificado enviado · 13:30',noteColor:'#8a99ab',btn:'CONFIGURAR',btnColor:C.cyan,border:'#475c70'},
+      {name:'WHATSAPP',...st('RECONECTANDO'),handle:'+55 11 9••••-4021',msgs:'9',lat:'—',routes:'DM',note:'sessão expirou às 13:40. Escaneie o QR code para reconectar.',noteColor:C.yel,btn:'GERAR QR CODE',btnColor:C.yel,border:'#606123'}
     ];
 
     // projetos
     const P=s.projects.find(p=>p.id===s.projSel)||s.projects[0];
     const projList=s.projects.map(p=>{const a=p.id===P.id;const act=p.running.length;return {...p,pick:()=>set({projSel:p.id,boot:s.boot&&s.boot.proj===p.id?s.boot:null,lMode:'interativo'}),
-      border:a?C.cyan:'#1a2733',shadow:a?'inset 0 0 30px rgba(0,240,255,.08)':'none',nameColor:a?C.cyan:'#e6edf3',
-      activeTxt:act?`${act} agente${act>1?'s':''} ativo${act>1?'s':''}`:'nenhum agente',activeColor:act?C.grn:'#6b7a8c',hasHandoff:!!p.handoff,
+      border:a?C.cyan:'#475c70',shadow:a?'inset 0 0 30px rgba(0,240,255,.08)':'none',nameColor:a?C.cyan:'#e6edf3',
+      activeTxt:act?`${act} agente${act>1?'s':''} ativo${act>1?'s':''}`:'nenhum agente',activeColor:act?C.grn:'#7e8c9b',hasHandoff:!!p.handoff,
       badges:p.running.map(r=>h(r.k))}});
     const setRun=(sid,fn)=>set({projects:s.projects.map(p=>p.id!==P.id?p:{...p,running:fn(p.running,sid)})});
     const running=P.running.map(r=>({...h(r.k),...r,agent:HS[r.k].name,ctxBar:bar(r.ctx)+' '+Math.round(r.ctx*100)+'%',sColor:ST[r.status]||C.yel,
@@ -1376,15 +1536,15 @@ class Component extends DCLogic {
       stop:()=>setRun(r.id,(l,id)=>l.filter(x=>x.id!==id))}));
     const LP=s.projects.find(p=>p.id===s.lProj)||s.projects[0];
     const projOpts=s.projects.map(p=>{const a=p.id===LP.id;return {id:p.id,path:p.path,pick:()=>set({lProj:p.id,lMode:'interativo',lTask:'',lBranch:'feat/'}),
-      bg:a?'rgba(0,240,255,.08)':'transparent',bc:a?C.cyan:'#1f3a48',color:a?C.cyan:'#e6edf3',hoTxt:p.handoff?'1 handoff pendente':p.running.length+' rodando',hoColor:p.handoff?C.mag:'#4f5d6e'}});
+      bg:a?'rgba(0,240,255,.08)':'transparent',bc:a?C.cyan:'#325f6f',color:a?C.cyan:'#e6edf3',hoTxt:p.handoff?'1 handoff pendente':p.running.length+' rodando',hoColor:p.handoff?C.mag:'#677b8e'}});
     const AG=['CC','CX','GM','CR','LE'].map(k=>{const a=s.lAgent===k;const H=HS[k];return {...H,label:H.name,pick:()=>set({lAgent:k}),
-      bg:a?H.hColorSolid:'transparent',color:a?'#0a0a0f':H.hColorSolid,bc:a?H.hColorSolid:'#1f3a48',note:k==='LE'?'autônomo':k==='GM'?'ocioso':'pronto',noteColor:a?'#0a0a0f':'#6b7a8c'}});
+      bg:a?H.hColorSolid:'transparent',color:a?'#0a0a0f':H.hColorSolid,bc:a?H.hColorSolid:'#325f6f',note:k==='LE'?'autônomo':k==='GM'?'ocioso':'pronto',noteColor:a?'#0a0a0f':'#7e8c9b'}});
     const modesRaw=[['interativo','INTERATIVO','abre o console e você conduz'],['autonomo','AUTÔNOMO','roda sozinho e avisa no Telegram']];
     if(LP.handoff) modesRaw.push(['handoff','ASSUMIR HANDOFF',LP.handoff+' · '+LP.handoffTitle]);
     const modes=modesRaw.map(m=>{const a=s.lMode===m[0];return {label:m[1],desc:m[2],
       pick:()=>set({lMode:m[0],lTask:m[0]==='handoff'?`Continuar ${LP.handoff}: ${LP.handoffTitle}. Ler onde parou e resolver os itens em aberto.`:s.lTask}),
-      border:a?C.mag:'#1a2733',bg:a?'rgba(255,43,214,.07)':'transparent',color:a?C.mag:'#e6edf3',mark:a?'◆':'◇'}});
-    const memRows=LP.mem.map(m=>{const key=LP.id+m[0];const on=!s.lMemOff[key];return {slug:m[0],s:m[1],tk:m[2],mark:on?'▣':'□',color:on?C.mag:'#4f5d6e',textColor:on?'#e6edf3':'#6b7a8c',
+      border:a?C.mag:'#475c70',bg:a?'rgba(255,43,214,.07)':'transparent',color:a?C.mag:'#e6edf3',mark:a?'◆':'◇'}});
+    const memRows=LP.mem.map(m=>{const key=LP.id+m[0];const on=!s.lMemOff[key];return {slug:m[0],s:m[1],tk:m[2],mark:on?'▣':'□',color:on?C.mag:'#677b8e',textColor:on?'#e6edf3':'#7e8c9b',
       toggle:()=>set({lMemOff:{...s.lMemOff,[key]:on}})}});
     const memOn=LP.mem.filter(m=>!s.lMemOff[LP.id+m[0]]);
     const memTk=memOn.reduce((a,m)=>a+parseFloat(m[2]),0).toFixed(1);
@@ -1412,7 +1572,7 @@ class Component extends DCLogic {
       threadGroups, th, threadCount:allT.length, runningCount:live.filter(t=>t.status==='ATIVA'||t.status==='INICIANDO').length,
       projList, P:{...P,launchHere:()=>openL(P.id)}, running, hasRunning:running.length>0, noRunning:running.length===0, agentOpts:AG, modes, memRows, memSummary:`${memOn.length} páginas · ${memTk}k tokens`,
       lBranch:s.lBranch, lTask:s.lTask, onBranch:e=>set({lBranch:e.target.value}), onTask:e=>set({lTask:e.target.value}),
-      wtMark:s.lWorktree?'▣':'□', wtColor:s.lWorktree?C.cyan:'#4f5d6e', toggleWt:()=>set({lWorktree:!s.lWorktree}), branchOpacity:s.lWorktree?1:.4,
+      wtMark:s.lWorktree?'▣':'□', wtColor:s.lWorktree?C.cyan:'#677b8e', toggleWt:()=>set({lWorktree:!s.lWorktree}), branchOpacity:s.lWorktree?1:.4,
       launchSummary:`${HS[s.lAgent].name} em ${LP.id} · ⎇ ${s.lWorktree?s.lBranch:LP.branch} · ${memOn.length} páginas`, launchNext:isHo?'assume o handoff e abre a sessão no console':s.lMode==='autonomo'?'roda em segundo plano; você acompanha pela lista RODANDO':'abre a nova sessão no console', launch, projOpts, launcher:s.launcher, closeLauncher:()=>set({launcher:false}), navGroups, goProjetos:()=>set({screen:'projetos'}),
       modal:s.modal, openModal:()=>set({modal:true}), closeModal:()=>set({modal:false}), npPath:s.npPath, npName:s.npName,
       onNpPath:e=>set({npPath:e.target.value}), onNpName:e=>set({npName:e.target.value}), addProject,
