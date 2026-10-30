@@ -142,6 +142,27 @@ conexão e limites do serviço autenticado pelo CLI. As sessões também seguem 
 política de histórico nativa de cada CLI. O modo `anthropic-api` continua
 disponível e usa `ANTHROPIC_API_KEY` junto com `agent.default_model`.
 
+## Personalidade
+
+O tom da LEA mora em `agent.persona`, no `~/.lea/config.toml`, e entra no prompt
+de **toda** execução — com ou sem skill. Skill é mecanismo de tarefa: escolhida
+por execução, opcional, com auto-melhoria. Voz não é opcional, então não cabe lá.
+
+O padrão é seco e direto, com sarcasmo bem dosado: no máximo uma alfinetada por
+resposta, sempre na situação (o código esquisito, o bug que era um typo, a
+própria LEA) e nunca em quem está falando. Desliga nos momentos em que piada é
+ruído — algo quebrado em produção, uma recusa, perda de dados ou segurança. E
+nunca entra no conteúdo técnico: resultado, número, erro e risco saem retos.
+
+```toml
+[agent]
+persona = """..."""   # esvaziar devolve o tom neutro do modelo
+```
+
+A persona é inserida **depois** das regras de escopo e segurança, de propósito:
+assim um texto de tom não tem como reescrever o que ela pode fazer. Há teste
+fixando isso em `tests/unit/test_persona.py`.
+
 ## Agente autônomo
 
 O projeto precisa ter `allow_autonomous` habilitado; projetos novos começam
@@ -385,13 +406,19 @@ python3 -m http.server 8731
 Telas: Overview, Projetos, Console, Memória, Skills, Histórico & Handoffs,
 Automações, Canais & Agentes.
 
-O painel lateral traz o avatar 3D com quatro expressões (neutra, ouvindo,
-pensando, falando), escolhidas automaticamente pelo contexto: ela ouve enquanto
-você digita, pensa enquanto o Codex trabalha e fala a resposta em voz alta, com
-a boca e o gráfico de onda sincronizados. A lente óptica fica vermelha enquanto
-ela pensa. Com `window.LEA_API` configurado, o chat vai para o agente real
-(`POST /api/agent/runs`, backend `codex`); sem isso a página segue como
-demonstração. Veja [Avatar LEA](docs/avatar.md).
+O painel lateral traz só o avatar 3D e a onda sonora — sem controles, porque
+as quatro expressões são comandadas pelo agente, não escolhidas à mão: **neutra**
+ociosa, **ouvindo** enquanto você digita ou grava áudio, **pensando** enquanto os
+agentes trabalham, **falando** quando ela de fato responde. A lente óptica fica
+vermelha enquanto ela pensa, e a boca e a onda acompanham a voz.
+
+Abra pelo próprio daemon, para a página ficar na mesma origem da API:
+
+```
+http://127.0.0.1:7420/app/index.html?token=$(cat ~/.lea/ui_token)&project=1
+```
+
+Veja [Avatar LEA](docs/avatar.md).
 
 Interface em português do Brasil; código, tabelas e APIs em inglês.
 

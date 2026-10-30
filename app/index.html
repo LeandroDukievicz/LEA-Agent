@@ -264,15 +264,15 @@ body{margin:0;background:#000;color:#d7e3ee;-webkit-font-smoothing:antialiased}
 a{color:#00f0ff;text-decoration:none}a:hover{color:#ff2bd6}
 ::selection{background:#ff2bd6;color:#0a0a0f}
 input::placeholder{color:#4f5d6e}
-.lea-shell{width:100%;grid-template-columns:232px minmax(0,1208px) minmax(320px,1fr)}
+.lea-shell{width:100%;grid-template-columns:232px minmax(0,1208px) minmax(380px,1fr)}
 .lea-avatar-panel{grid-column:3;grid-row:1;position:sticky;top:20px;align-self:start;padding:20px 20px 40px}
-.lea-avatar-panel>section{max-width:470px;margin-left:auto}
+.lea-avatar-panel>section{max-width:560px;margin-left:auto}
 @media (max-width:1650px){
   .lea-shell{grid-template-columns:232px minmax(0,1fr)}
   .lea-navigation{grid-column:1;grid-row:1 / span 2}
   .lea-shell>main{grid-column:2;grid-row:2}
   .lea-avatar-panel{grid-column:2;grid-row:1;position:static;padding:16px 28px 0}
-  .lea-avatar-panel>section{max-width:390px}
+  .lea-avatar-panel>section{max-width:460px}
 }
 @media (max-width: 1100px) {
   .lea-console {display:flex !important;flex-direction:column;height:auto !important;min-height:0 !important}
@@ -940,18 +940,8 @@ input::placeholder{color:#4f5d6e}
 <aside class="lea-avatar-panel" aria-label="Avatar LEA">
     <section style="background:#000;border:1px solid #1a2733;padding:12px;font:400 11px/1.4 'JetBrains Mono',monospace">
       <div style="display:flex;justify-content:space-between;color:#00f0ff;letter-spacing:.06em;margin-bottom:8px"><span>┌─ AVATAR LEA ─┐</span><span style="color:#8a99ab">PRÉVIA</span></div>
-      <lea-avatar id="lea-face" style="height:312px"></lea-avatar>
-      <label for="avatar-expression" style="display:block;color:#8a99ab;margin-top:10px">Expressão</label>
-      <select id="avatar-expression" value="{{ avatarExpression }}" sc-camel-on-change="{{ onAvatarExpression }}" style="width:100%;margin-top:5px;padding:6px;background:#07080d;color:#e6edf3;border:1px solid #1a3944;font:inherit">
-        <option value="auto">Automática (contexto)</option><option value="neutral">Neutra</option><option value="listening">Ouvindo</option><option value="thinking">Pensando</option><option value="speaking">Falando</option>
-      </select>
-      <label for="avatar-speech" style="display:block;color:#8a99ab;margin-top:10px">Teste de fala</label>
-      <div style="display:flex;gap:6px;margin-top:5px">
-        <input id="avatar-speech" placeholder="Olá, eu sou a LEA." style="flex:1;min-width:0;padding:6px;background:#07080d;color:#e6edf3;border:1px solid #1a3944;font:inherit">
-        <button id="avatar-speak" type="button" style="padding:6px 10px;background:#07080d;color:#00f0ff;border:1px solid #1a3944;font:inherit;cursor:pointer">Falar</button>
-      </div>
-      <lea-waveform avatar="#lea-face" style="height:92px;margin-top:8px"></lea-waveform>
-      <div id="avatar-speech-note" style="color:#6b7a8c;margin-top:7px">A boca e a onda acompanham a voz do navegador.</div>
+      <lea-avatar id="lea-face" style="height:470px"></lea-avatar>
+      <lea-waveform avatar="#lea-face" style="height:104px;margin-top:6px"></lea-waveform>
     </section>
 </aside>
 <sc-if value="{{ launcher }}" hint-placeholder-val="{{ false }}">
@@ -1111,7 +1101,7 @@ class Component extends DCLogic {
   state={
     screen:this.props.startScreen||'overview', now:new Date(2026,9,27,14,3,2), memTab:'page', treeSel:'decaimento',
     sessFilter:'ALL', skillFilter:'Todas', claimed:{}, cronSel:2, modelOpen:false, model:'claude-sonnet-4.5',
-    input:'/', expanded:{t2:true}, extraMsgs:[], liveFeed:[], feedN:0, avatarExpression:'auto',
+    input:'/', expanded:{t2:true}, extraMsgs:[], liveFeed:[], feedN:0,
     projects:PROJ0, projSel:'lea-core', lAgent:'CC', lMode:'interativo', lBranch:'feat/', lTask:'', lWorktree:true, lMemOff:{}, boot:null,
     modal:false, npPath:'', npName:'', thread:'s-c4d2', pins:{'s-c4d2':true}, launcher:false, lProj:'lea-core'
   };
@@ -1438,7 +1428,6 @@ class Component extends DCLogic {
       sessions, sessFilters, handoffs, pendingCount:pending,
       skills, skillFilters, crons, selCron,
       messages, input:s.input, showSlash, slashItems, models, modelOpen:s.modelOpen, model:s.model, injected,
-      avatarExpression:s.avatarExpression, onAvatarExpression:e=>set({avatarExpression:e.target.value}),
       toggleModel:()=>set({modelOpen:!s.modelOpen}),
       onInput:e=>set({input:e.target.value}),
       onKey:e=>{if(e.key==='Enter'&&s.input.trim()){const t=s.input.trim();set({input:'',extraMsgs:[...s.extraMsgs,{isUser:true,text:t},{isAgent:true,text:t.startsWith('/')?`Comando ${t.split(' ')[0]} executado.`:'Entendido. Vou registrar isso na memória e te aviso quando terminar.'}]})}
@@ -1449,31 +1438,5 @@ class Component extends DCLogic {
 }
 </script>
 
-<script>
-// Botão de teste de fala: delegado no document para sobreviver às re-renderizações do runtime.
-document.addEventListener('click', event => {
-  const button = event.target.closest && event.target.closest('#avatar-speak');
-  if (!button) return;
-  const avatar = document.querySelector('lea-avatar');
-  const field = document.getElementById('avatar-speech');
-  const note = document.getElementById('avatar-speech-note');
-  const text = ((field && (field.value || field.placeholder)) || '').trim();
-  if (!avatar || !avatar.speak || !text) return;
-  button.disabled = true;
-  if (note) note.textContent = 'Falando…';
-  window.LeaPresence && window.LeaPresence.signal('reply', {});
-  avatar.speak(text)
-    .then(() => { if (note) note.textContent = 'A boca acompanha a voz do navegador.'; })
-    .catch(error => { if (note) note.textContent = 'Sem voz disponível: ' + (error && error.message || error); })
-    .then(() => { button.disabled = false; });
-});
-
-// A expressão é escolhida sozinha pelo contexto; o seletor só serve para forçar uma delas.
-document.addEventListener('change', event => {
-  if (event.target.id !== 'avatar-expression' || !window.LeaPresence) return;
-  const value = event.target.value;
-  window.LeaPresence.setAuto(value === 'auto', value);
-});
-</script>
 
 </body></html>

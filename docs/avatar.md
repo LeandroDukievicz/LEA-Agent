@@ -118,7 +118,7 @@ O daemon serve `app/` em `/app` justamente para a página ficar na **mesma orige
 
 Também dá para configurar à mão com `window.LEA_API = {base, token, projectId}`. Sem token o módulo fica inerte: a página segue como demonstração e só os sinais locais (digitação, teste de fala) mexem o rosto dela.
 
-O seletor de expressão no painel começa em **Automática (contexto)**. Escolher uma expressão fixa assume o controle; voltar para automática devolve.
+Não há seletor no painel: quem manda é o agente. Um controle manual ali seria um botão mentindo sobre quem decide. Para forçar uma expressão em teste, use a API:
 
 ```js
 LeaPresence.signal('working');                  // força um estado pelo contexto

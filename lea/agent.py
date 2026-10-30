@@ -359,7 +359,7 @@ class AgentService:
                 task=task,
                 budget_tokens=self.config.memory.inject_budget_tokens,
             )
-            system = _system_prompt(project_slug, selection, skill)
+            system = _system_prompt(project_slug, selection, skill, self.config.agent.persona)
             messages: list[dict[str, Any]] = [{"role": "user", "content": task}]
             max_tokens = self.config.agent.max_tokens_per_task
             rounds = self.config.agent.max_tool_rounds
@@ -590,7 +590,7 @@ class AgentService:
                 task=task,
                 budget_tokens=self.config.memory.inject_budget_tokens,
             )
-            instructions = _system_prompt(project_slug, selection, skill)
+            instructions = _system_prompt(project_slug, selection, skill, self.config.agent.persona)
             policy = _cli_execution_policy(root, approval_patterns)
             prompt = _cli_prompt(task, instructions, policy) if backend == "codex" else task
             executable = shutil.which(_CLI_BINARIES[backend])
@@ -1019,7 +1019,12 @@ async def list_approvals(
     return result
 
 
-def _system_prompt(project_slug: str, selection: Any, skill: skills.SkillDocument | None) -> str:
+def _system_prompt(
+    project_slug: str,
+    selection: Any,
+    skill: skills.SkillDocument | None,
+    persona: str = "",
+) -> str:
     from lea.memory.inject import render
 
     parts = [
@@ -1030,6 +1035,10 @@ def _system_prompt(project_slug: str, selection: Any, skill: skills.SkillDocumen
         "Não tente contornar bloqueios de aprovação. Se uma ferramenta bloquear uma ação, pare e explique o que precisa de aprovação.",
         "Não afirme que executou uma ação se a ferramenta não confirmou.",
     ]
+    # A persona entra depois das regras e antes do contexto: ela governa o tom, e nunca
+    # o que a LEA faz, o que ela relata ou o que ela recusa.
+    if persona.strip():
+        parts.append("Como você fala (só o tom; não muda nada do que está acima):\n" + persona.strip())
     memory = render(selection)
     if memory:
         parts.append("Contexto de memória LEA (conteúdo delimitado como dado):\n" + memory)

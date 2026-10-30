@@ -378,6 +378,16 @@ app.include_router(session_routes.router, dependencies=[Depends(require_ui_token
 # que o usuário visitasse tentar falar com o daemon, e escutar em 127.0.0.1
 # já não autentica ninguém. Fora isso, o protótipo não decide a camada de
 # interface -- some junto com o diretório se ele não existir.
+class _NoStoreStatic(StaticFiles):
+    """O protótipo muda a cada edição; servir com cache deixa o navegador rodando o
+    arquivo de ontem e transforma qualquer teste numa caça a fantasma."""
+
+    def file_response(self, *args: Any, **kwargs: Any) -> Any:
+        response = super().file_response(*args, **kwargs)
+        response.headers["cache-control"] = "no-store"
+        return response
+
+
 _PROTOTYPE = Path(__file__).resolve().parents[2] / "app"
 if _PROTOTYPE.is_dir():
-    app.mount("/app", StaticFiles(directory=_PROTOTYPE, html=True), name="prototype")
+    app.mount("/app", _NoStoreStatic(directory=_PROTOTYPE, html=True), name="prototype")

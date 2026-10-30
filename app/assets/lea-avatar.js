@@ -250,9 +250,12 @@
         const w = Math.max(this.clientWidth, 1), h = Math.max(this.clientHeight, 1);
         renderer.setSize(w, h, false);
         this.camera.aspect = w / h;
-        // `fitY` already holds the exact distance her tallest cell needs; the width only
-        // ever binds on a card taller than it is wide.
-        const wide = this.nearest + (W / 2 + .5) * MARGIN / (SPREAD * this.camera.aspect);
+        // `fitY` já é exato; o horizontal se resolve aqui, com o aspecto em mãos.
+        let wide = 0;
+        for (let i = 0; i < this.reachZ.length; i++) {
+          const need = this.reachZ[i] + this.reachX[i] / this.camera.aspect;
+          if (need > wide) wide = need;
+        }
         this.camera.position.z = Math.max(this.fitY, wide);
         this.camera.updateProjectionMatrix();
       };
@@ -302,6 +305,7 @@
       // gives an exact fit: the relief can never push the crown of her head off the card.
       this.nearest = 0;
       this.fitY = 0;
+      const reachX = [], reachZ = [];     // o par (profundidade, |x|) de cada célula visível
       const place = (mesh, slot, index, hinge) => {
         const x = index % W, y = (index / W) | 0, entry = PIXELS[index], cid = CLASS_OF[entry];
         const front = frontOf(x, y, cid);
@@ -313,6 +317,8 @@
         if (front > this.nearest) this.nearest = front;
         if (cid !== CLASS.void) {                         // the black slab may run off the edges
           this.fitY = Math.max(this.fitY, front + (Math.abs(position.y) + .5) * MARGIN / SPREAD);
+          reachZ.push(front);
+          reachX.push((Math.abs(position.x) + .5) * MARGIN / SPREAD);
         }
         const pull = jawPull(x, y, cid);
         if (pull > .001) hinge.cells.push({slot, pull, restY: position.y});
@@ -340,6 +346,11 @@
         restY: Float32Array.from(cells, cell => cell.restY),
         pull: Float32Array.from(cells, cell => cell.pull),
       }));
+      // O horizontal depende do aspecto, que só se conhece no resize, então guarda-se o par
+      // por célula em vez de um único número: senão o ajuste teria de supor que a célula mais
+      // larga é também a mais próxima, e reservaria margem que ninguém usa.
+      this.reachZ = Float32Array.from(reachZ);
+      this.reachX = Float32Array.from(reachX);
       this.jawOpen = 0;
       this.jawApplied = -1;
       this.alert = 0;
