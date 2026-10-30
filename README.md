@@ -1,5 +1,9 @@
 # LEA-Agent
 
+<p align="center">
+  <img src="docs/reference/lea-apresentacao.png" alt="Arte de apresentação da LEA, uma agente cibernética em pixel art" width="380">
+</p>
+
 Centro de comando **self-hosted** para agentes de IA com memória persistente.
 É um **programa desktop em Python**, que roda na máquina do usuário — não é um
 site nem um serviço hospedado.
@@ -390,7 +394,7 @@ pelos testes.
 
 ## Interface & Telas do Projeto
 
-A interface do LEA é um centro de comando desktop com estética cyberpunk/terminal dark, combinando supervisão operacional em tempo real, navegação em grafos de conhecimento, terminal interativo e um **avatar 3D em voxels WebGL (Three.js)** com sincronia labial e onda de áudio reativa.
+A interface do LEA é um centro de comando desktop com estética cyberpunk/terminal dark, combinando supervisão operacional em tempo real, navegação em grafos de conhecimento, terminal interativo e um **avatar em relevo WebGL (Three.js)** com sincronia labial e onda de áudio reativa.
 
 ```
 wireframe.html     protótipo, página única autocontida
@@ -485,9 +489,9 @@ Modal de inicialização rápida de agentes com configuração completa de conte
 
 ---
 
-### Painel Lateral & Avatar 3D (LEA)
+### Painel Lateral & Avatar (LEA)
 
-O painel lateral acompanha a navegação exibindo o avatar procedural em relevo de voxels WebGL e o visualizador de onda de áudio. Suas quatro expressões reagem organicamente aos estados do agente:
+O painel lateral acompanha a navegação exibindo o avatar em relevo WebGL com a imagem de referência e o visualizador de onda de áudio. Suas quatro expressões reagem organicamente aos estados do agente:
 
 - **Neutra (`neutral`)**: Estado de repouso com pulsos azuis saindo do implante óptico pelas trilhas de neon.
 - **Ouvindo (`listening`)**: Pulsos invertem a direção, fluindo para dentro da lente enquanto você digita ou grava áudio.

@@ -1,132 +1,9 @@
-/* LEA's portrait: the reference artwork rebuilt in Three.js as a lit voxel relief.
-   Every pixel of the 96x96 map in lea-portrait.js becomes a box whose depth comes from a
-   blurred silhouette, so the head domes, the optic implant floats and the neon traces hover
-   in front of it. Public attributes: expression and mouth (0-1). */
+/* LEA: high-resolution reference on a deformable Three.js relief. */
 (() => {
   const T = window.THREE;
-  const ART = window.LEA_PORTRAIT;
-  if (!T || !ART || customElements.get('lea-avatar')) return;
-
-  const W = ART.width, H = ART.height, CELLS = W * H;
-  const MID_X = (W - 1) / 2, MID_Y = (H - 1) / 2;
-  const CROWN = ART.crown || 0;                             // rows the generator rebuilt on top
-  const CLASS = Object.fromEntries(ART.classNames.map((name, i) => [name, i]));
-  const CODE = new Map(Array.from(ART.alphabet, (ch, i) => [ch, i]));
-  const COLORS = ART.palette.map(hex => new T.Color('#' + hex));
-  const LUMA = COLORS.map(c => .2126 * c.r + .7152 * c.g + .0722 * c.b);
-  const CLASS_OF = ART.paletteClass;
-  // The artwork's background is near-black; snap it to true black so the 96x96 plate melts
-  // into the card behind it instead of reading as a panel laid on top.
-  COLORS.forEach((color, entry) => { if (CLASS_OF[entry] === CLASS.void) color.setRGB(0, 0, 0); });
-  // Neon entries skip the lighting pass so the circuitry keeps the artwork's full chroma.
-  const UNLIT = new Set([CLASS.void, CLASS.circuit, CLASS.implant, CLASS.back]);
-  const isNeon = entry => UNLIT.has(CLASS_OF[entry]) || (CLASS_OF[entry] === CLASS.warm && LUMA[entry] > .3);
-
-  /* While she is thinking the lens runs red. Rotating each palette entry's hue rather than
-     flooding it with one red keeps the artwork's own shading inside the disc: the hot core
-     stays hot, the rim stays a rim. */
-  const ALERT = COLORS.map(color => {
-    const hsl = {h: 0, s: 0, l: 0};
-    color.getHSL(hsl);
-    return new T.Color().setHSL(.995, Math.min(1, hsl.s * 1.15 + .34), hsl.l * .8);
-  });
-  const HALO_CALM = new T.Color(0x6ef4ff), HALO_ALERT = new T.Color(0xff3b42);
-
-  const FOV = 38;
-  const SPREAD = Math.tan(FOV * Math.PI / 360);             // half the vertical frustum
-  const MARGIN = 1.05;                                      // a little air around her
-
-  function decode(text, out) {
-    let at = 0;
-    for (let i = 0; i < text.length; i += 2) {
-      const value = CODE.get(text[i]), run = CODE.get(text[i + 1]) + 1;
-      out.fill(value, at, at + run);
-      at += run;
-    }
-    return out;
-  }
-
-  const PIXELS = decode(ART.pixels, new Uint8Array(CELLS));
-
-  /* Depth relief -----------------------------------------------------------
-     Blurring the silhouette a few times turns it into a smooth height field: thick
-     areas (the skull, the cheek) rise, thin ones (stray locks, traces) stay flat. */
-  const blur = (src, radius) => {
-    const span = radius * 2 + 1, mid = new Float32Array(CELLS), out = new Float32Array(CELLS);
-    const clamp = (v, limit) => v < 0 ? 0 : v > limit - 1 ? limit - 1 : v;
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-      let sum = 0;
-      for (let k = -radius; k <= radius; k++) sum += src[y * W + clamp(x + k, W)];
-      mid[y * W + x] = sum / span;
-    }
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-      let sum = 0;
-      for (let k = -radius; k <= radius; k++) sum += mid[clamp(y + k, H) * W + x];
-      out[y * W + x] = sum / span;
-    }
-    return out;
-  };
-  let relief = new Float32Array(CELLS);
-  for (let i = 0; i < CELLS; i++) {
-    const cid = CLASS_OF[PIXELS[i]];
-    relief[i] = (cid === CLASS.void || cid === CLASS.back) ? 0 : 1;
-  }
-  for (let pass = 0; pass < 3; pass++) relief = blur(relief, 6);
-
-  const BACK_PLANE = -11;
-  function frontOf(x, y, cid) {
-    if (cid === CLASS.back) return -19;                       // out-of-focus city lights
-    if (cid === CLASS.void) return -13;
-    if (cid === CLASS.implant) {                              // the lens bulges out of its socket
-      const d = Math.hypot(x - ART.implant.cx, y - ART.implant.cy) / ART.implant.r;
-      return 16 + 6 * Math.sqrt(Math.max(0, 1 - d * d));
-    }
-    const dome = Math.pow(relief[y * W + x], .55);
-    if (cid === CLASS.circuit) return 13 + 2.5 * dome;        // traces hover off the skin
-    const turned = (58 - x) * .15;                            // she is three-quarter on to the lens
-    return BACK_PLANE + 2 + 27 * dome + turned + (cid === CLASS.hair ? 1.8 : 0);
-  }
-  // Solid classes extrude back to BACK_PLANE; these are slabs that hang free of the head.
-  const floats = cid => cid === CLASS.circuit || cid === CLASS.implant || cid === CLASS.back || cid === CLASS.void;
-
-  const inBox = (x, y, box) => x >= box[0] && x < box[0] + box[2] && y >= box[1] && y < box[1] + box[3];
-  const inFeature = (x, y) => inBox(x, y, ART.eye.box) || inBox(x, y, ART.mouth.box);
-
-  /* How much of the jaw swing each cell takes. The gradient is what makes this work: the lip
-     line holds still and the chin travels furthest, so neighbouring rows never pull more than
-     a fraction of a cell apart and the relief stays watertight while the mouth opens. */
-  const ramp = (value, from, to) => Math.min(1, Math.max(0, (value - from) / (to - from)));
-  function jawPull(x, y, cid) {
-    if (cid === CLASS.circuit || cid === CLASS.implant || cid === CLASS.back) return 0;
-    if (cid === CLASS.void && !inBox(x, y, ART.mouth.box)) return 0;
-    const row = y - CROWN;
-    return ramp(row, 58, 70) * ramp(row, 82, 74) * ramp(x, 40, 45) * ramp(x, 74, 68);
-  }
-
-  function gradientTexture(size, paint) {
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = size;
-    paint(canvas.getContext('2d'));
-    const texture = new T.CanvasTexture(canvas);
-    texture.colorSpace = T.SRGBColorSpace;                    // or the renderer re-encodes it bright
-    return texture;
-  }
-
-  /* A soft radial sprite stands in for a bloom pass, which the UMD build has no composer for. */
-  const glowTexture = () => gradientTexture(64, ctx => {
-    const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-    grad.addColorStop(0, 'rgba(255,255,255,.5)');
-    grad.addColorStop(.4, 'rgba(255,255,255,.1)');
-    grad.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 64, 64);
-  });
-
-  /* Lip sync ---------------------------------------------------------------
-     Mouth frame 0 is the resting artwork; lea-portrait.js supplies the visemes after it. */
-  const MOUTH = {rest: 0};
-  ART.mouth.shapes.forEach((name, i) => { MOUTH[name] = i + 1; });
-
+  if (!T || customElements.get('lea-avatar')) return;
+  const imageURL = new URL('lea-retrato.png', document.currentScript.src).href;
+  const MOUTH = {rest: 0, ajar: 1, open: 2, wide: 3, round: 4, narrow: 5, gape: 6};
   // Which shape a letter asks for. Anything unlisted is a consonant: lips barely part.
   const LETTER_SHAPE = {};
   const assign = (letters, shape) => { for (const ch of letters) LETTER_SHAPE[ch] = MOUTH[shape]; };
@@ -183,295 +60,154 @@
 
   class LeaAvatar extends HTMLElement {
     static get observedAttributes() { return ['expression', 'mouth']; }
-
     connectedCallback() {
-      if (this.scene) return;
+      if (this.renderer) return;
       const shadow = this.shadowRoot || this.attachShadow({mode: 'open'});
       shadow.innerHTML = `<style>
         :host{display:block;min-height:220px;position:relative;background:#000;overflow:hidden}
         canvas{display:block;width:100%;height:100%}
-        .vignette{position:absolute;inset:0;pointer-events:none;
-          background:radial-gradient(ellipse at 48% 46%,rgba(0,0,0,0) 46%,rgba(0,0,0,.34) 86%,rgba(0,0,0,.7) 100%)}
         .fallback{display:grid;place-items:center;min-height:220px;color:#789;font:11px monospace;text-align:center;padding:16px}
         .fallback[hidden]{display:none}
-      </style><div class="fallback" hidden>Avatar 3D indisponível neste navegador.</div><div class="vignette"></div>`;
-      try {
-        this.start(shadow);
-      } catch (err) {
+      </style><div class="fallback" hidden>Avatar indisponível neste navegador.</div>`;
+      try { this.start(shadow); } catch (error) {
         shadow.querySelector('.fallback').hidden = false;
-        console.warn('LEA avatar:', err);
-        this.dispose();
+        console.warn('LEA avatar:', error); this.dispose();
       }
     }
-
-    attributeChangedCallback() { /* values are read on the next animation frame */ }
+    attributeChangedCallback() {}
     disconnectedCallback() { this.dispose(); }
-
     start(shadow) {
-      const renderer = this.renderer = new T.WebGLRenderer({antialias: true, powerPreference: 'low-power'});
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+      const renderer = this.renderer = new T.WebGLRenderer({antialias: true, powerPreference: 'high-performance'});
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       renderer.outputColorSpace = T.SRGBColorSpace;
-      renderer.setClearColor(0x000000, 1);                    // absolute black, flush with the card
-      shadow.prepend(renderer.domElement);                    // the vignette overlay stays on top
-
-      const scene = this.scene = new T.Scene();
-      this.camera = new T.PerspectiveCamera(FOV, 1, 1, 600);
-      const stage = this.stage = new T.Group();
-      scene.add(stage);
-
-      scene.add(new T.AmbientLight(0xffffff, 2.78));
-      const key = (color, intensity, x, y, z) => {
-        const light = new T.DirectionalLight(color, intensity);
-        light.position.set(x, y, z);
-        scene.add(light);
-      };
-      key(0x5ff4ff, .79, -60, 18, 70);   // implant side
-      key(0xff4f9d, .55, 70, 30, 55);    // hair side
-      key(0xffffff, .36, 0, 80, 40);
-
-      this.buildCells(stage);
-      this.buildGlow(stage);
-      this.buildFeatures();
-
-      this.reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+      renderer.setClearColor(0x000000, 1);
+      shadow.prepend(renderer.domElement);
+      this.scene = new T.Scene();
+      this.camera = new T.PerspectiveCamera(38, 1, .1, 100);
+      this.stage = new T.Group(); this.scene.add(this.stage);
+      this.jawOpen = this.alert = this.absorb = this.roundness = 0;
       this.pointer = {x: 0, y: 0};
+      this.reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
       this.onPointer = event => {
         const rect = this.getBoundingClientRect();
         if (!rect.width || !rect.height) return;
-        this.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-        this.pointer.y = ((event.clientY - rect.top) / rect.height) * 2 - 1;
+        this.pointer.x = (event.clientX - rect.left) / rect.width * 2 - 1;
+        this.pointer.y = (event.clientY - rect.top) / rect.height * 2 - 1;
       };
       this.onLeave = () => { this.pointer.x = this.pointer.y = 0; };
       this.addEventListener('pointermove', this.onPointer);
       this.addEventListener('pointerleave', this.onLeave);
-
       this.resize = () => {
         if (!this.renderer) return;
         const w = Math.max(this.clientWidth, 1), h = Math.max(this.clientHeight, 1);
         renderer.setSize(w, h, false);
         this.camera.aspect = w / h;
-        // `fitY` já é exato; o horizontal se resolve aqui, com o aspecto em mãos.
-        let wide = 0;
-        for (let i = 0; i < this.reachZ.length; i++) {
-          const need = this.reachZ[i] + this.reachX[i] / this.camera.aspect;
-          if (need > wide) wide = need;
-        }
-        this.camera.position.z = Math.max(this.fitY, wide);
+        const aspect = 1191 / 1321;
+        this.camera.position.z = Math.max(1, aspect / this.camera.aspect) * 1.09 / Math.tan(38 * Math.PI / 360) + .17;
         this.camera.updateProjectionMatrix();
       };
-      this.resizeObserver = new ResizeObserver(this.resize);
-      this.resizeObserver.observe(this);
-      this.resize();
-
-      this.started = performance.now();
-      this.frame = requestAnimationFrame(now => this.draw(now));
-    }
-
-    /* One instanced box per pixel, split into a lit mesh (skin, hair, lips) and an
-       unlit one (implant, traces, bokeh) that keeps the neon at full strength. */
-    buildCells(stage) {
-      // Every cell is placed, unlit background included: the void slab keeps the shoulder and
-      // the hair shadows reading as solid mass instead of fragments floating over the backdrop.
-      // Cells inside the eye and mouth boxes always stay lit, dark ones included: the lids and
-      // the jaw repaint them, so they need a slot in the mesh setFeature writes to.
-      const litCells = [], neonCells = [];
-      for (let index = 0; index < CELLS; index++) {
-        const unlit = isNeon(PIXELS[index]) && !inFeature(index % W, (index / W) | 0);
-        (unlit ? neonCells : litCells).push(index);
-      }
-
-      const box = new T.BoxGeometry(1, 1, 1);
-      box.setAttribute('color', new T.BufferAttribute(new Float32Array(box.attributes.position.count * 3).fill(1), 3));
-      const makeMesh = (count, material) => {
-        const mesh = new T.InstancedMesh(box, material, count);
-        mesh.frustumCulled = false;
-        return mesh;
-      };
-      this.litMesh = makeMesh(litCells.length, new T.MeshLambertMaterial({vertexColors: true}));
-      this.neonMesh = makeMesh(neonCells.length, new T.MeshBasicMaterial({vertexColors: true}));
-
-      this.slotOf = new Int32Array(CELLS).fill(-1);
-      this.neonEntry = new Uint8Array(neonCells.length);
-      this.neonClass = new Uint8Array(neonCells.length);
-      this.neonFlow = new Float32Array(neonCells.length);
-      this.neonAngle = new Float32Array(neonCells.length);
-      this.glowSeeds = [];
-
-      const matrix = new T.Matrix4(), position = new T.Vector3(), scale = new T.Vector3();
-      const quaternion = new T.Quaternion();
-      const jaw = [{mesh: this.litMesh, cells: []}, {mesh: this.neonMesh, cells: []}];
-      // Framing budget. A cell at depth `front` and height |y| stays on screen only while the
-      // camera sits at least `front + |y| / SPREAD` away, so tracking that maximum while placing
-      // gives an exact fit: the relief can never push the crown of her head off the card.
-      this.nearest = 0;
-      this.fitY = 0;
-      const reachX = [], reachZ = [];     // o par (profundidade, |x|) de cada célula visível
-      const place = (mesh, slot, index, hinge) => {
-        const x = index % W, y = (index / W) | 0, entry = PIXELS[index], cid = CLASS_OF[entry];
-        const front = frontOf(x, y, cid);
-        const back = floats(cid) ? front - 2.2 : BACK_PLANE;
-        position.set(x - MID_X, MID_Y - y, (front + back) / 2);
-        scale.set(1, 1, Math.max(front - back, .6));
-        mesh.setMatrixAt(slot, matrix.compose(position, quaternion, scale));
-        mesh.setColorAt(slot, COLORS[entry]);
-        if (front > this.nearest) this.nearest = front;
-        if (cid !== CLASS.void) {                         // the black slab may run off the edges
-          this.fitY = Math.max(this.fitY, front + (Math.abs(position.y) + .5) * MARGIN / SPREAD);
-          reachZ.push(front);
-          reachX.push((Math.abs(position.x) + .5) * MARGIN / SPREAD);
+      this.resizeObserver = new ResizeObserver(this.resize); this.resizeObserver.observe(this); this.resize();
+      const image = this.image = new Image();
+      image.onload = () => {
+        if (!this.renderer || !this.isConnected) return;
+        try {
+          this.buildRelief(image); this.started = performance.now();
+          this.frame = requestAnimationFrame(now => this.draw(now));
+        } catch (error) {
+          console.warn('LEA avatar:', error); shadow.querySelector('.fallback').hidden = false; this.dispose();
         }
-        const pull = jawPull(x, y, cid);
-        if (pull > .001) hinge.cells.push({slot, pull, restY: position.y});
-        return {x, y, entry, cid, front};
       };
-
-      litCells.forEach((index, slot) => {
-        place(this.litMesh, slot, index, jaw[0]);
-        this.slotOf[index] = slot;
-      });
-      neonCells.forEach((index, slot) => {
-        const cell = place(this.neonMesh, slot, index, jaw[1]);
-        this.neonEntry[slot] = cell.entry;
-        this.neonClass[slot] = cell.cid;
-        this.neonFlow[slot] = Math.hypot(cell.x - ART.implant.cx, cell.y - ART.implant.cy);
-        this.neonAngle[slot] = Math.atan2(cell.y - ART.implant.cy, cell.x - ART.implant.cx);
-        if (LUMA[cell.entry] > .22) this.glowSeeds.push(cell);
-      });
-
-      // Flatten the hinge into typed arrays: the Y translation of an instance matrix lives at
-      // element 13, so a swing is one pass of float writes rather than rebuilt matrices.
-      this.jaw = jaw.filter(part => part.cells.length).map(({mesh, cells}) => ({
-        mesh,
-        offset: Int32Array.from(cells, cell => cell.slot * 16 + 13),
-        restY: Float32Array.from(cells, cell => cell.restY),
-        pull: Float32Array.from(cells, cell => cell.pull),
-      }));
-      // O horizontal depende do aspecto, que só se conhece no resize, então guarda-se o par
-      // por célula em vez de um único número: senão o ajuste teria de supor que a célula mais
-      // larga é também a mais próxima, e reservaria margem que ninguém usa.
-      this.reachZ = Float32Array.from(reachZ);
-      this.reachX = Float32Array.from(reachX);
-      this.jawOpen = 0;
-      this.jawApplied = -1;
-      this.alert = 0;
-      this.absorb = 0;
-
-      stage.add(this.litMesh, this.neonMesh);
+      image.onerror = () => { shadow.querySelector('.fallback').hidden = false; };
+      image.src = imageURL;
     }
-
-    /** 0-1, how far her mouth is open right now: the hook for anything syncing to her voice. */
+    buildRelief(image) {
+      const texture = new T.Texture(image);
+      texture.colorSpace = T.SRGBColorSpace; texture.needsUpdate = true;
+      texture.anisotropy = Math.min(4, this.renderer.capabilities.getMaxAnisotropy());
+      const uniforms = this.uniforms = {
+        portrait: {value: texture}, time: {value: 0}, mouth: {value: 0}, mouthShape: {value: 0},
+        lid: {value: 0}, roundness: {value: 0}, alert: {value: 0}, absorb: {value: 0}, flow: {value: 1}, motion: {value: 1},
+      };
+      const material = new T.ShaderMaterial({
+        uniforms, transparent: true, depthWrite: false,
+        vertexShader: `
+          uniform float mouth;
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            vec3 p = position;
+            // A shallow dome with a raised optic lens and cheek; the original texture stays sharp.
+            float dome = exp(-dot((uv-vec2(.52,.52))*vec2(2.5,2.0), (uv-vec2(.52,.52))*vec2(2.5,2.0)));
+            float lens = exp(-dot((uv-vec2(.37,.55))*vec2(11.0,11.0), (uv-vec2(.37,.55))*vec2(11.0,11.0)));
+            p.z += .16*dome + .045*lens;
+            float jaw = exp(-dot((uv-vec2(.51,.30))*vec2(8.0,9.0), (uv-vec2(.51,.30))*vec2(8.0,9.0)));
+            p.y -= mouth * .008 * jaw;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform sampler2D portrait;
+          uniform float time, mouth, roundness, lid, alert, absorb, flow, motion;
+          varying vec2 vUv;
+          void main() {
+            vec2 uv = vUv;
+            // Follow the slanted lip seam in the portrait. A small, even jaw shift keeps
+            // the lower lip from being stretched into a point as the mouth opens; the
+            // opening tapers at the corners and rounding stays subtle during speech.
+            float seam = .366 - (uv.x - .503) * .13;
+            float halfWidth = mix(.047, .044, roundness);
+            float across = abs((uv.x-.503) / halfWidth);
+            float taper = pow(max(0.0, 1.0-across*across), .8);
+            float drop = mouth * .012 * taper;
+            vec2 region = (uv - vec2(.503,.340)) / vec2(.085,.085);
+            float jawArea = 1.0-smoothstep(.50,1.35,dot(region,region));
+            float belowSeam = 1.0-smoothstep(seam-.001,seam+.001,uv.y);
+            vec2 sampleUv = uv;
+            sampleUv.y += mouth * .012 * jawArea * belowSeam;
+            sampleUv.x += (uv.x-.503) * roundness * mouth * .012 * jawArea;
+            // Sample the same fine pixel-art grid for both lips and the surrounding face.
+            vec2 pixelGrid = vec2(150.0, 166.0);
+            vec2 pixelUv = (floor(sampleUv * pixelGrid) + .5) / pixelGrid;
+            vec4 color = texture2D(portrait, pixelUv);
+            float topEdge = seam;
+            float bottomEdge = seam - drop;
+            float opening = (1.0-smoothstep(topEdge-.0005,topEdge+.0005,uv.y));
+            opening *= smoothstep(bottomEdge-.0005,bottomEdge+.0005,uv.y);
+            opening *= (1.0-smoothstep(.92,1.0,across)) * smoothstep(.06,.25,mouth);
+            // The opening uses the same absolute black as the panel background.
+            color.rgb = mix(color.rgb, vec3(0.0), opening);
+            // A skin-toned eyelid closes over the visible eye without changing the rest of the art.
+            vec2 eye = (uv - vec2(.629,.553)) / vec2(.065,.030);
+            float eyeArea = 1.0 - smoothstep(.72,1.05,dot(eye,eye));
+            float cover = smoothstep(1.05-lid*2.15, 1.22-lid*2.15, eye.y) * eyeArea * smoothstep(.02,.3,lid);
+            vec3 skin = texture2D(portrait, vec2(uv.x, .588)).rgb;
+            color.rgb = mix(color.rgb, skin*.85, cover);
+            // Only saturated light sources on the mechanical side or in the lower circuitry
+            // receive moving energy; the hair and skin retain their original colour.
+            float high = max(max(color.r,color.g),color.b);
+            float low = min(min(color.r,color.g),color.b);
+            float cyan = smoothstep(.12,.5,color.g+color.b-2.0*color.r) * smoothstep(.14,.48,high);
+            float neonPink = smoothstep(.16,.55,color.r+color.b-2.0*color.g) * smoothstep(.3,.68,high);
+            float zone = max(1.0-smoothstep(.43,.51,uv.x), smoothstep(.83,.91,uv.x));
+            zone = max(zone, 1.0-smoothstep(.23,.30,uv.y));
+            float circuitry = max(cyan, neonPink*.7) * zone * smoothstep(.05,.3,high-low);
+            float dist = length((uv-vec2(.37,.55))*vec2(1.1,1.0));
+            float direction = mix(1.0,-1.0,absorb);
+            float travel = fract(dist*4.8 - time*.42*flow*direction);
+            float pulse = pow(max(0.0,1.0-abs(travel-.5)*5.0),3.0) * motion;
+            color.rgb += color.rgb * circuitry * (.10 + pulse*(.65+.25*absorb));
+            float lens = 1.0-smoothstep(.04,.085,length((uv-vec2(.37,.55))*vec2(1.0,1.0)));
+            color.rgb = mix(color.rgb, vec3(high, high*.08, high*.10), lens*cyan*alert*.8);
+            if (color.a < .005) discard;
+            gl_FragColor = color;
+            #include <colorspace_fragment>
+          }
+        `,
+      });
+      const geometry = new T.PlaneGeometry(2 * 1191 / 1321, 2, 160, 176);
+      this.stage.add(new T.Mesh(geometry, material));
+    }
     get speechLevel() { return this.jawOpen || 0; }
-
-    /** Carry the lens and trace colours through to their bloom and halo. */
-    paintGlow(alert, absorb) {
-      if (Math.abs(alert - this.lensAlert) < .01 && Math.abs(absorb - this.lensAbsorb) < .01) return;
-      this.lensAlert = alert;
-      this.lensAbsorb = absorb;
-      const tint = new T.Color();
-      for (let i = 0; i < this.lensGlow.slot.length; i++) {
-        const entry = this.lensGlow.entry[i];
-        tint.copy(COLORS[entry]);
-        if (this.lensGlow.cid[i] === CLASS.implant) {
-          tint.lerp(ALERT[entry], alert);
-        } else {
-          tint.setRGB(tint.r * (1 - absorb * .45), tint.g, tint.b).multiplyScalar(1 + absorb * .55);
-        }
-        this.glowMesh.setColorAt(this.lensGlow.slot[i], tint.multiplyScalar(this.lensGlow.scale[i]));
-      }
-      this.glowMesh.instanceColor.needsUpdate = true;
-      this.halo.material.color.copy(HALO_CALM).lerp(HALO_ALERT, alert);
-    }
-
-    /** Swing the jaw `drop` cells down, graded by each cell's share of the hinge. */
-    applyJaw(drop) {
-      if (Math.abs(drop - this.jawApplied) < .004) return;
-      this.jawApplied = drop;
-      for (const part of this.jaw) {
-        const matrices = part.mesh.instanceMatrix.array;
-        for (let i = 0; i < part.offset.length; i++) {
-          matrices[part.offset[i]] = part.restY[i] - drop * part.pull[i];
-        }
-        part.mesh.instanceMatrix.needsUpdate = true;
-      }
-    }
-
-    buildGlow(stage) {
-      const sprite = new T.PlaneGeometry(1, 1);
-      const material = new T.MeshBasicMaterial({
-        map: glowTexture(), transparent: true, blending: T.AdditiveBlending,
-        depthWrite: false, vertexColors: true,
-      });
-      sprite.setAttribute('color', new T.BufferAttribute(new Float32Array(sprite.attributes.position.count * 3).fill(1), 3));
-      const mesh = this.glowMesh = new T.InstancedMesh(sprite, material, this.glowSeeds.length);
-      mesh.frustumCulled = false;
-      mesh.renderOrder = 2;
-
-      const matrix = new T.Matrix4(), position = new T.Vector3(), scale = new T.Vector3();
-      const quaternion = new T.Quaternion(), tint = new T.Color();
-      const lensGlow = [];
-      this.glowSeeds.forEach((cell, slot) => {
-        const strength = Math.min(1, LUMA[cell.entry] * 2.1);
-        const spread = 2.2 + 2.6 * strength;
-        position.set(cell.x - MID_X, MID_Y - cell.y, cell.front + 1.2);
-        scale.set(spread, spread, 1);
-        mesh.setMatrixAt(slot, matrix.compose(position, quaternion, scale));
-        mesh.setColorAt(slot, tint.copy(COLORS[cell.entry]).multiplyScalar(.07 + .13 * strength));
-        // The bloom has to follow its source, or a red eye keeps a cyan halo and the traces
-        // brighten without their glow. Only these two classes ever change colour.
-        if (cell.cid === CLASS.implant || cell.cid === CLASS.circuit) {
-          lensGlow.push({slot, entry: cell.entry, strength, cid: cell.cid});
-        }
-      });
-      this.lensGlow = {
-        slot: Int32Array.from(lensGlow, g => g.slot),
-        entry: Uint8Array.from(lensGlow, g => g.entry),
-        scale: Float32Array.from(lensGlow, g => .07 + .13 * g.strength),
-        cid: Uint8Array.from(lensGlow, g => g.cid),
-      };
-      this.lensAlert = -1;
-      this.lensAbsorb = -1;
-      stage.add(mesh);
-
-      this.halo = new T.Mesh(sprite, new T.MeshBasicMaterial({
-        map: material.map, color: HALO_CALM.clone(), transparent: true,
-        blending: T.AdditiveBlending, depthWrite: false, opacity: .16,
-      }));
-      this.halo.position.set(ART.implant.cx - MID_X, MID_Y - ART.implant.cy, 24);
-      this.halo.scale.setScalar(ART.implant.r * 2.6);
-      this.halo.renderOrder = 3;
-      stage.add(this.halo);
-    }
-
-    // Feature frames: index 0 is the untouched artwork, then progressively lidded / opened.
-    buildFeatures() {
-      const crop = box => {
-        const [x0, y0, w, h] = box, out = new Uint8Array(w * h);
-        for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) out[yy * w + xx] = PIXELS[(y0 + yy) * W + x0 + xx];
-        return out;
-      };
-      const unpack = (box, text) => decode(text, new Uint8Array(box[2] * box[3]));
-      this.lids = {box: ART.eye.box, applied: -1, frames: [crop(ART.eye.box),
-        unpack(ART.eye.box, ART.eye.half), unpack(ART.eye.box, ART.eye.shut)]};
-      this.lips = {box: ART.mouth.box, applied: -1, frames: [crop(ART.mouth.box),
-        ...ART.mouth.frames.map(text => unpack(ART.mouth.box, text))]};
-    }
-
-    setFeature(feature, state) {
-      if (feature.applied === state) return;
-      feature.applied = state;
-      const [x0, y0, w, h] = feature.box, frame = feature.frames[state];
-      for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) {
-        const slot = this.slotOf[(y0 + yy) * W + x0 + xx];
-        if (slot >= 0) this.litMesh.setColorAt(slot, COLORS[frame[yy * w + xx]]);
-      }
-      this.litMesh.instanceColor.needsUpdate = true;
-    }
-
-    /* Lip sync ------------------------------------------------------------
-       Two drivers feed the same mouth: `speak` times visemes off the synthesiser's own word
-       boundaries, `attachAudio` reads loudness off any playing audio. Used together, the
-       voice decides how far the jaw drops and the text decides the shape. */
-
     speak(text, options = {}) {
       const synth = window.speechSynthesis;
       if (!synth) return Promise.reject(new Error('SpeechSynthesis indisponível neste navegador.'));
@@ -519,14 +255,17 @@
     attachAudio(source) {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx || !source) return null;
-      const context = this.audioContext || (this.audioContext = new Ctx());
+      this.detachAudio();
+      const isMedia = source instanceof HTMLMediaElement;
+      const isStream = typeof MediaStream !== 'undefined' && source instanceof MediaStream;
+      const context = (!isMedia && !isStream && source.context) || source.__leaSource?.context ||
+        (this.audioContext || (this.audioContext = new Ctx()));
       let node;
-      if (typeof MediaStream !== 'undefined' && source instanceof MediaStream) {
+      if (isStream) {
         node = context.createMediaStreamSource(source);
-      } else if (source instanceof HTMLMediaElement) {
-        // An element can only be tapped once, so reuse the node on replays.
+      } else if (isMedia) {
         node = source.__leaSource || (source.__leaSource = context.createMediaElementSource(source));
-        node.connect(context.destination);                  // keep it audible
+        if (!source.__leaAudible) { node.connect(context.destination); source.__leaAudible = true; }
       } else {
         node = source;
       }
@@ -534,6 +273,7 @@
       analyser.fftSize = 1024;
       analyser.smoothingTimeConstant = .6;
       node.connect(analyser);
+      this.audioNode = node;
       this.analyser = analyser;
       this.samples = new Uint8Array(analyser.fftSize);
       if (context.state === 'suspended') context.resume();
@@ -541,9 +281,12 @@
     }
 
     detachAudio() {
+      if (this.audioNode && this.analyser) this.audioNode.disconnect(this.analyser);
       this.analyser?.disconnect();
+      this.audioNode = null;
       this.analyser = null;
       this.samples = null;
+      this.level = null;
     }
 
     /** Smoothed 0-1 loudness of the attached audio, or null when nothing is attached. */
@@ -594,124 +337,52 @@
       return {shape: mood.mouth, open: APERTURE[mood.mouth]};
     }
 
-    /* Pulses chase outward from the implant along the traces; the lens breathes and sweeps.
-       `alert` (0-1) crossfades the lens to red while she thinks; `absorb` (0-1) hardens the
-       traces to cyan and turns their pulses around, inbound to the lens. */
-    paintNeon(t, mood, alert, absorb) {
-      const tint = new T.Color();
-      const span = 34, head = (t * 26 * mood.flow) % span;
-      const breath = .86 + .14 * Math.sin(t * 2.1);
-      // Each inbound wave lands on the lens when the cycle wraps, and the lens drinks it.
-      const arrival = mood.absorb ? Math.pow(1 - Math.min(head, span - head) / (span * .5), 8) : 0;
-      for (let slot = 0; slot < this.neonEntry.length; slot++) {
-        const entry = this.neonEntry[slot], base = COLORS[entry], cid = this.neonClass[slot];
-        if (cid === CLASS.void) continue;                   // the backdrop slab never animates
-        let gain = mood.glow, lift = 0;
-        let r = base.r, g = base.g, b = base.b;
-        if (cid === CLASS.circuit) {
-          // Outward by default; while absorbing, the wave runs back down the trace into the lens.
-          const wave = mood.absorb ? this.neonFlow[slot] + head : this.neonFlow[slot] - head;
-          const offset = ((wave % span) + span) % span;
-          const pulse = offset < 5 ? (1 - offset / 5) ** 2 : 0;
-          gain *= breath * (1 + absorb * .55);
-          r *= 1 - absorb * .45;                            // draining red leaves a harder cyan
-          lift = pulse * (.55 + absorb * .3);
-        } else if (cid === CLASS.implant) {
-          const sweep = Math.cos(this.neonAngle[slot] - t * 1.9 * mood.flow);
-          gain *= .84 + .16 * Math.sin(t * 2.4 - this.neonFlow[slot] * .45);
-          lift = .3 * Math.pow(Math.max(0, sweep), 10) + arrival * .3;
-          if (alert > 0) {
-            const red = ALERT[entry];
-            r += (red.r - r) * alert;
-            g += (red.g - g) * alert;
-            b += (red.b - b) * alert;
-          }
-        } else if (cid === CLASS.back) {
-          gain *= .9 + .1 * Math.sin(t * .7 + this.neonFlow[slot]);
-        }
-        tint.setRGB(
-          Math.min(1, r * gain + lift),
-          Math.min(1, g * gain + lift),
-          Math.min(1, b * gain + lift));
-        this.neonMesh.setColorAt(slot, tint);
-      }
-      this.neonMesh.instanceColor.needsUpdate = true;
-    }
-
     draw(now) {
-      if (!this.renderer) return;
-      // The first rAF timestamp can predate `started`, and negative time walks the cycle
-      // tables backwards, so clamp before anything indexes off it.
-      const t = Math.max(0, (now - this.started) / 1000);
-      const reduced = this.reduced.matches;
+      if (!this.renderer || !this.uniforms) return;
+      const t = Math.max(0, (now-this.started)/1000), reduced = this.reduced.matches;
       const mood = MOODS[this.getAttribute('expression')] || MOODS.neutral;
-
-      const cycle = 4.4, left = cycle - (t % cycle);
-      const blink = (!reduced && left < .26) ? (left > .2 || left < .06 ? 1 : 2) : 0;
-      this.setFeature(this.lids, Math.max(mood.lid, blink));
-
-      // The pixels snap between visemes the way the artwork would, but the jaw underneath
-      // eases, so speech reads as one continuous movement instead of a flipbook.
       const mouth = this.mouthFrame(t, mood, reduced);
-      this.setFeature(this.lips, mouth.shape);
-      this.jawOpen += (mouth.open - this.jawOpen) * (mouth.open > this.jawOpen ? .42 : .26);
-      this.applyJaw(reduced ? mouth.open * 1.5 : this.jawOpen * 1.5);
-
-      // The lens bleeds to red while she thinks and drifts back to cyan once she is done;
-      // the traces harden to cyan while she listens. Both ease, so the change is never abrupt.
-      const settle = (value, target) => {
-        const next = value + (target - value) * .055;
-        return next < .004 ? 0 : next;
-      };
+      const elapsed = Math.min(.1, Math.max(0, (now-(this.lastFrame || now))/1000));
+      this.lastFrame = now;
+      const speed = mouth.open > this.jawOpen ? 13 : 9;
+      this.jawOpen += (mouth.open-this.jawOpen) * (1-Math.exp(-speed*elapsed));
+      const rounded = mouth.shape === MOUTH.round || mouth.shape === MOUTH.narrow ? 1 : 0;
+      this.roundness += (rounded-this.roundness) * (1-Math.exp(-9*elapsed));
+      const settle = (v,target) => v + (target-v)*.055;
       this.alert = settle(this.alert, mood.alert ? 1 : 0);
       this.absorb = settle(this.absorb, mood.absorb ? 1 : 0);
-      this.paintNeon(t, mood, this.alert, this.absorb);
-      this.paintGlow(this.alert, this.absorb);
-      this.halo.material.opacity = (.11 + .05 * Math.sin(t * (2.4 + this.alert * 2.2))) * mood.glow;
-      this.halo.scale.setScalar(ART.implant.r * (2.5 + .18 * Math.sin(t * 1.7)));
-
+      const cycle = 4.4, left = cycle - (t % cycle);
+      const blink = !reduced && left < .26 ? (left > .2 || left < .06 ? .55 : 1) : 0;
+      const u = this.uniforms;
+      u.time.value = t; u.mouth.value = this.jawOpen; u.mouthShape.value = mouth.shape; u.roundness.value = this.roundness;
+      u.lid.value = Math.max(blink, mood.lid ? .38 : 0);
+      u.alert.value = this.alert; u.absorb.value = this.absorb; u.flow.value = mood.flow;
+      u.motion.value = reduced ? 0 : 1;
       const sway = reduced ? 0 : mood.sway;
-      // Open vowels tip the head a touch, the way a real speaker punches a syllable.
-      const stress = this.jawOpen * .035;
-      const yaw = Math.sin(t * .42) * .055 * sway + this.pointer.x * -.16;
-      const pitch = Math.sin(t * .31) * .025 * sway + this.pointer.y * .1 + stress;
-      this.stage.rotation.y += (yaw - this.stage.rotation.y) * .07;
-      this.stage.rotation.x += (pitch - this.stage.rotation.x) * .07;
-      this.stage.position.y = reduced ? 0 : Math.sin(t * .65) * .5;
-
-      this.renderer.render(this.scene, this.camera);
+      const yaw = reduced ? 0 : Math.sin(t*.42)*.035*sway-this.pointer.x*.065;
+      const pitch = reduced ? 0 : Math.sin(t*.31)*.018*sway+this.pointer.y*.04;
+      this.stage.rotation.y += (yaw-this.stage.rotation.y)*.07;
+      this.stage.rotation.x += (pitch-this.stage.rotation.x)*.07;
+      this.stage.position.y = reduced ? 0 : Math.sin(t*.65)*.012;
+      this.renderer.render(this.scene,this.camera);
       this.frame = requestAnimationFrame(next => this.draw(next));
     }
-
     dispose() {
       if (this.frame) cancelAnimationFrame(this.frame);
-      this.resizeObserver?.disconnect();
-      this.removeEventListener('pointermove', this.onPointer);
-      this.removeEventListener('pointerleave', this.onLeave);
+      this.frame = null; this.lastFrame = null; this.resizeObserver?.disconnect();
+      this.removeEventListener('pointermove',this.onPointer); this.removeEventListener('pointerleave',this.onLeave);
       if (this.speech) window.speechSynthesis?.cancel();
-      this.speech = null;
-      this.detachAudio();
-      this.audioContext?.close();
-      this.audioContext = null;
-      if (this.scene) {
-        const geometries = new Set(), materials = new Set(), textures = new Set();
-        this.scene.traverse(object => {
-          if (object.geometry) geometries.add(object.geometry);
-          for (const material of [].concat(object.material || [])) {
-            materials.add(material);
-            if (material.map) textures.add(material.map);
-          }
-        });
-        geometries.forEach(g => g.dispose());
-        materials.forEach(m => m.dispose());
-        textures.forEach(tx => tx.dispose());
-      }
-      this.renderer?.dispose();
-      this.renderer?.domElement.remove();
-      this.renderer = null;
-      this.scene = null;
+      this.speech = null; this.detachAudio(); this.audioContext?.close(); this.audioContext = null;
+      if (this.image) { this.image.onload = this.image.onerror = null; this.image = null; }
+      if (this.scene) this.scene.traverse(object => {
+        object.geometry?.dispose();
+        if (object.material) {
+          object.material.uniforms?.portrait?.value?.dispose(); object.material.dispose();
+        }
+      });
+      this.renderer?.dispose(); this.renderer?.domElement.remove();
+      this.renderer = this.scene = this.uniforms = null;
     }
   }
-
   customElements.define('lea-avatar', LeaAvatar);
 })();

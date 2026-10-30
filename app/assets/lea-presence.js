@@ -145,6 +145,45 @@
     },
   };
 
+  // Local voice preview: no agent run or network request. Delegation survives UI re-renders.
+  let previewRunning = false;
+  const previewStatus = text => {
+    const status = document.querySelector('[data-lea-speech-status]');
+    if (status) status.textContent = text;
+  };
+  document.addEventListener('click', async event => {
+    const button = event.target.closest?.('[data-lea-test-speech]');
+    if (!button || previewRunning) return;
+    const avatar = presence.node();
+    if (!avatar?.speak) { previewStatus('Avatar indisponível.'); return; }
+    if (presence.state === 'speaking') { previewStatus('A LEA já está falando.'); return; }
+    previewRunning = true;
+    button.disabled = true;
+    previewStatus('Reproduzindo...');
+    const before = avatar.getAttribute('expression');
+    const stateBefore = presence.state;
+    try {
+      const voices = window.speechSynthesis?.getVoices() || [];
+      const voice = voices.find(v => /^pt-BR$/i.test(v.lang)) || voices.find(v => /^pt/i.test(v.lang));
+      await avatar.speak('Olá! Eu sou a LEA. Estou pronta para ajudar você.', {lang: 'pt-BR', voice});
+      previewStatus('');
+    } catch {
+      // Speech may be unavailable or lack a voice; the visible simulation remains useful.
+      const current = presence.node();
+      if (current && presence.state === stateBefore) current.setAttribute('expression', 'speaking');
+      previewStatus('Voz indisponível; simulando movimento.');
+      await new Promise(resolve => setTimeout(resolve, 4000));
+      if (current?.isConnected && presence.state === stateBefore && current.getAttribute('expression') === 'speaking') {
+        if (before) current.setAttribute('expression', before);
+        else current.removeAttribute('expression');
+      }
+    } finally {
+      previewRunning = false;
+      const currentButton = document.querySelector('[data-lea-test-speech]');
+      if (currentButton) currentButton.disabled = false;
+    }
+  }, true);
+
   // Local signals, delegated on the document so they survive the runtime re-rendering.
   let quiet = 0;
   document.addEventListener('input', event => {
