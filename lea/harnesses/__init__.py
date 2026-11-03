@@ -16,12 +16,14 @@ from lea.harnesses.base import (
     InstallReport,
     find_binary,
 )
+from lea.harnesses.agy import Agy
 from lea.harnesses.claude_code import ClaudeCode
 from lea.harnesses.codex import Codex
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "Agy",
     "LEA_HOOK_EVENTS",
     "ClaudeCode",
     "Codex",
@@ -42,9 +44,10 @@ def all_harnesses() -> list[Harness]:
     """Adaptadores conhecidos, na ordem em que a UI mostra.
 
     Claude Code e Codex primeiro porque são os dois que a Fase 3 entrega;
-    os demais chegam depois, e a matriz os mostra como ausentes até lá.
+    o agy vem em seguida, com hooks ausentes por limite do próprio CLI. Os
+    demais chegam depois, e a matriz os mostra como ausentes até lá.
     """
-    return [ClaudeCode(), Codex()]
+    return [ClaudeCode(), Codex(), Agy()]
 
 
 def get(harness_id: str) -> Harness | None:

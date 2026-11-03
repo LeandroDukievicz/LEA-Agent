@@ -106,6 +106,25 @@ class AgentConfig(BaseModel):
     )
 
 
+class FleetConfig(BaseModel):
+    """A frota de três agentes que `lea fleet up` sobe de uma vez.
+
+    As travas moram aqui, e não no código, porque soltar ou prender um papel é
+    decisão de operação: `lea/fleet.py` descreve os papéis, este bloco decide
+    quanta corda cada um tem. Vazio = o CLI roda com as próprias defesas.
+    """
+
+    #: Flags extras por harness, aplicadas ao subir a sessão. O SERVIDOR é quem
+    #: lê isto: aceitar argv do cliente deixaria qualquer portador do token da
+    #: interface anexar argumento arbitrário a um processo local.
+    flags: dict[str, list[str]] = Field(default_factory=dict)
+
+    #: Com a coleira, o publicador prepara o commit e descreve o que subiria,
+    #: mas não executa o push. É o único papel cujo erro sai da máquina, e o
+    #: único ponto da frota onde uma trava custa quase nada.
+    leash_publisher: bool = True
+
+
 class ModelTokenPricing(BaseModel):
     input_usd_per_million: float = Field(ge=0)
     output_usd_per_million: float = Field(ge=0)
@@ -168,6 +187,7 @@ class Config(BaseSettings):
     server: ServerConfig = Field(default_factory=ServerConfig)
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
     agent: AgentConfig = Field(default_factory=AgentConfig)
+    fleet: FleetConfig = Field(default_factory=FleetConfig)
     costs: CostsConfig = Field(default_factory=CostsConfig)
     ui: UIConfig = Field(default_factory=UIConfig)
 

@@ -123,6 +123,7 @@ class Launcher:
         use_worktree: bool = False,
         budget_tokens: int | None = None,
         handoff_id: str | None = None,
+        extra_args: list[str] | None = None,
     ) -> dict[str, Any]:
         """Inicia uma sessão e devolve o estado inicial dela."""
         if not pty.supported():
@@ -156,6 +157,14 @@ class Launcher:
 
         # 1. comando
         command = harness.launch_cmd(task=task or None)
+        # Flags de operação (soltar travas do CLI, por exemplo) vêm do config do
+        # SERVIDOR, nunca do corpo da requisição: aceitar argv de um cliente
+        # deixaria qualquer portador do token anexar argumento a um processo
+        # local. A rota é quem lê `config.fleet.flags` e passa aqui.
+        if extra_args:
+            # Logo depois do executável, nunca no fim: vários CLIs param de ler
+            # flags assim que encontram um posicional, e a tarefa é posicional.
+            command = [command[0], *(str(arg) for arg in extra_args), *command[1:]]
         steps.append(_step("comando", " ".join(command)))
 
         # 2. worktree isolada, quando pedida

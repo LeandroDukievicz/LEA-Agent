@@ -168,3 +168,26 @@ def _loads(raw: str) -> dict[str, Any]:
     except (TypeError, ValueError):
         return {}
     return value if isinstance(value, dict) else {"value": value}
+
+
+async def reap_orphans(conn: aiosqlite.Connection) -> int:
+    """Encerra sessões que ficaram ``active`` de um processo anterior.
+
+    Os PTY pertencem ao processo que os abriu. Se o daemon caiu -- queda,
+    ``kill``, duas instâncias disputando a porta --, as linhas continuam
+    ``active`` e ninguém mais está do outro lado. Varrer na subida é correto
+    por construção: nenhuma sessão viva pode ter sobrevivido ao dono dela.
+
+    Sem isso o estado mente, e mentir sobre o que está rodando é pior que não
+    saber: ``lea fleet status`` listava três agentes de pé que já não existiam.
+    """
+    async with conn.execute("SELECT id FROM sessions WHERE status = 'active'") as cursor:
+        orphans = [row["id"] for row in await cursor.fetchall()]
+    if not orphans:
+        return 0
+    await conn.execute(
+        "UPDATE sessions SET status = 'ended', ended_at = ? WHERE status = 'active'",
+        (_now(),),
+    )
+    await conn.commit()
+    return len(orphans)

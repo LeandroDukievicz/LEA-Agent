@@ -36,6 +36,7 @@ from lea.db import session as db
 from lea.memory import Memory
 from lea import handoffs
 from lea import skills
+from lea import sessions
 from lea.agent import AgentService
 from lea.cron import CronScheduler
 from fastapi.staticfiles import StaticFiles
@@ -116,6 +117,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     await memory.setup()
     app.state.memory = memory
+    # Sessões que sobraram ``active`` de um processo anterior: os PTY morreram
+    # junto com o dono, então a linha é mentira até ser varrida.
+    orphans = await sessions.reap_orphans(app.state.db)
+    if orphans:
+        logger.info("%d sessão(ões) órfã(s) de execução anterior marcadas como encerradas", orphans)
+
     skill_sync = await skills.sync_from_disk(app.state.db)
     if skill_sync["problems"]:
         logger.warning("%d skill(s) não puderam ser indexadas", len(skill_sync["problems"]))

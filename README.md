@@ -49,7 +49,7 @@ Requer Python 3.12+ e [uv](https://docs.astral.sh/uv/).
 uv sync --extra dev
 uv run lea doctor      # confere instalação, permissões e banco
 uv run lea daemon      # sobe o núcleo em 127.0.0.1:7420
-uv run pytest          # 206 testes (unidade + aceite)
+uv run pytest          # 223 testes (unidade + aceite)
 ```
 
 Testes de aceite exercitam o LEA pela borda — HTTP, WebSocket, MCP por stdio,
@@ -71,6 +71,7 @@ lea mcp        servidor MCP lea.memory, por stdio
 lea harnesses  matriz de integração dos agentes; --install para configurar
 lea reindex    reconstrói o índice da memória a partir do git
 lea run        executa uma tarefa via Codex CLI, Claude Code ou Anthropic API
+lea fleet      sobe, acompanha e encerra a frota de três agentes
 lea doctor     diagnostica a instalação
 ```
 
@@ -99,6 +100,12 @@ frequência:
 |---|---|---|
 | Claude Code | `~/.claude/settings.json`, chave `hooks` | `claude mcp add --scope user` |
 | Codex CLI | `~/.codex/hooks.json` | `codex mcp add` |
+| Antigravity CLI (`agy`) | **não expõe hooks** | `agy mcp add` |
+
+O `agy` 1.4.10 não tem hook de ciclo de vida — não há menção em `agy --help` e a
+chave não existe no `settings.json` dele. O adaptador reporta isso como ausência
+explícita (○) em vez de fingir que está lá: a sessão de agy é observada pelo PTY
+e pelo que ela grava na memória via MCP, não por evento estruturado.
 
 O Codex exige **confiar** em cada hook novo antes de executá-lo (há um
 `trusted_hash` por hook em `config.toml`). O LEA não forja esse hash nem sugere
@@ -168,6 +175,56 @@ persona = """..."""   # esvaziar devolve o tom neutro do modelo
 A persona é inserida **depois** das regras de escopo e segurança, de propósito:
 assim um texto de tom não tem como reescrever o que ela pode fazer. Há teste
 fixando isso em `tests/unit/test_persona.py`.
+
+## Frota
+
+`lea fleet up` sobe três agentes de uma vez, cada um com um papel só:
+
+| Papel | Harness | Faz | Worktree |
+|---|---|---|---|
+| Gerente | Codex | decide o que fazer, delega e registra o porquê na memória | não |
+| Implementador | Claude Code | escreve código; não commita nem publica | **sim** |
+| Publicador | agy (Antigravity CLI) | observa o repositório, commita e publica | não |
+
+```bash
+uv run lea daemon                 # em outro terminal
+uv run lea fleet up --project 1
+uv run lea fleet status
+uv run lea fleet down
+```
+
+O papel chega como **prompt de abertura**, e não como skill: o `Launcher` não
+injeta skill nenhuma — isso é mecanismo do `lea run`. Os três publicam no mesmo
+barramento de eventos, então o dashboard e a janela do avatar acompanham os três
+sem que nenhum saiba do outro. O daemon é o eixo; agente nenhum fala com agente.
+
+### Travas e a coleira
+
+Rodar os CLIs com as travas desligadas desliga a camada que o LEA **é**. Com
+`--yolo` e `--dangerously-skip-permissions` o LEA deixa de ser porteiro e vira
+gravador de voo: vê, registra e reconstrói, mas não barra. É escolha legítima num
+loop de desenvolvimento no próprio repositório, desde que feita de olho aberto.
+
+```toml
+[fleet]
+leash_publisher = true            # publicador prepara o commit, não dá push
+
+[fleet.flags]
+codex = ["--yolo"]
+claude-code = ["--dangerously-skip-permissions"]
+agy = ["--dangerously-skip-permissions"]
+```
+
+As flags são lidas pelo **servidor**, nunca aceitas no corpo da requisição:
+aceitar argv de um cliente deixaria qualquer portador do token da interface
+anexar argumento a um processo local. Elas entram logo depois do executável,
+porque vários CLIs param de ler flags ao encontrar o primeiro posicional — e a
+tarefa é posicional.
+
+Com as travas soltas, a única cerca que sobra é de sistema de arquivos: o
+implementador roda na própria worktree e não pisa no checkout dos outros. O
+publicador fica com o checkout real, porque é de lá que o push sai — e é ele
+quem leva a coleira, por ser o único cujo erro sai da máquina.
 
 ## Agente autônomo
 

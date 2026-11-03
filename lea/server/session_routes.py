@@ -211,6 +211,7 @@ async def create_session(
             branch=payload.get("branch"),
             use_worktree=bool(payload.get("use_worktree")),
             budget_tokens=config.memory.inject_budget_tokens,
+            extra_args=config.fleet.flags.get(str(payload.get("harness") or "")),
         )
     except LaunchError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

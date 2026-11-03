@@ -20,7 +20,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from lea import __version__, paths, status
+from lea import __version__, fleet, paths, status
 from lea.config import load
 from lea.db import schema
 from lea.db import session as db
@@ -55,6 +55,12 @@ skill_proposal_commands = typer.Typer(
     no_args_is_help=True,
     add_completion=False,
 )
+fleet_commands = typer.Typer(
+    name="fleet",
+    help="Sobe e acompanha a frota de três agentes (gerente, implementador, publicador).",
+    no_args_is_help=True,
+    add_completion=False,
+)
 channel_commands = typer.Typer(
     name="channels",
     help="Configura bots Telegram e Discord para o agente próprio.",
@@ -64,6 +70,7 @@ channel_commands = typer.Typer(
 app.add_typer(skill_commands, name="skills")
 skill_commands.add_typer(skill_proposal_commands, name="proposals")
 app.add_typer(channel_commands, name="channels")
+app.add_typer(fleet_commands, name="fleet")
 
 
 @app.callback()
@@ -761,3 +768,122 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+# ── frota ────────────────────────────────────────────────────────────────
+
+
+def _api_call(method: str, path: str, tolerate: bool = False, **kwargs: Any) -> Any:
+    """Chamada autenticada ao daemon. A CLI é cliente dele, como a interface.
+
+    A frota precisa disso porque o ``Launcher`` vive no loop do daemon: os PTY
+    que ele abre pertencem àquele processo. Um comando one-shot que subisse os
+    agentes por conta própria os mataria ao sair.
+    """
+    import httpx
+
+    config = load()
+    url = f"http://{config.server.host}:{config.server.port}{path}"
+    try:
+        response = httpx.request(
+            method,
+            url,
+            headers={"X-Lea-Token": tokens.ui_token()},
+            timeout=30.0,
+            **kwargs,
+        )
+    except httpx.ConnectError:
+        err_console.print(
+            "[red]daemon não está no ar.[/] Suba com [cyan]lea daemon[/] em outro terminal."
+        )
+        raise typer.Exit(1) from None
+    if response.status_code >= 400:
+        detail = response.json().get("detail", response.text) if response.content else response.text
+        if tolerate:
+            # Encerrar algo que já não roda não é falha: é o estado desejado.
+            return {"error": detail}
+        err_console.print(f"[red]{response.status_code}:[/] {detail}")
+        raise typer.Exit(1)
+    return response.json() if response.content else None
+
+
+def _fleet_sessions() -> list[dict[str, Any]]:
+    """Sessões ativas que carregam a marca da frota no prompt de abertura."""
+    body = _api_call("GET", "/api/sessions") or {}
+    found = body.get("sessions", body) if isinstance(body, dict) else body
+    return [s for s in found if isinstance(s, dict) and fleet.is_fleet_session(s.get("task"))]
+
+
+@fleet_commands.command("up")
+def fleet_up(
+    project: int = typer.Option(..., "--project", "-p", help="ID do projeto."),
+) -> None:
+    """Sobe os três agentes da frota: gerente, implementador e publicador."""
+    config = load()
+    table = Table(title=f"Frota no projeto {project}")
+    for column in ("Papel", "Harness", "Sessão", "Worktree"):
+        table.add_column(column)
+
+    started: list[str] = []
+    for role in fleet.ROLES:
+        payload = fleet.payload_for(role, project)
+        if role.id == "publicador" and not config.fleet.leash_publisher:
+            payload["task"] = fleet.task_for(role, leashed=False)
+        session = _api_call("POST", "/api/sessions", json=payload)
+        started.append(session["id"])
+        table.add_row(
+            role.title,
+            role.harness,
+            session["id"],
+            session.get("worktree_path") or "—",
+        )
+
+    console.print(table)
+    flags = config.fleet.flags
+    console.print(
+        f"Travas por harness: {flags or 'nenhuma (cada CLI com as próprias defesas)'}"
+    )
+    if config.fleet.leash_publisher:
+        console.print("Publicador [green]com coleira[/]: prepara o commit, não dá push.")
+    else:
+        console.print("Publicador [red]sem coleira[/]: pode publicar sozinho.")
+    console.print("Acompanhe em [cyan]lea fleet status[/] ou no dashboard.")
+
+
+@fleet_commands.command("status")
+def fleet_status() -> None:
+    """Mostra as sessões da frota que estão ativas."""
+    rows = _fleet_sessions()
+    if not rows:
+        console.print("Nenhuma sessão da frota ativa.")
+        return
+    table = Table(title="Frota")
+    for column in ("Papel", "Harness", "Sessão", "Estado", "Projeto"):
+        table.add_column(column)
+    for row in rows:
+        task = row.get("task") or ""
+        title = task.replace(fleet.TAG, "").strip().split("\n")[0] or "?"
+        table.add_row(
+            title,
+            str(row.get("harness") or "?"),
+            str(row.get("id") or "?"),
+            str(row.get("status") or "?"),
+            str(row.get("project_id") or "—"),
+        )
+    console.print(table)
+
+
+@fleet_commands.command("down")
+def fleet_down() -> None:
+    """Encerra as sessões da frota."""
+    rows = _fleet_sessions()
+    if not rows:
+        console.print("Nenhuma sessão da frota para encerrar.")
+        return
+    for row in rows:
+        result = _api_call("POST", f"/api/sessions/{row['id']}/stop", tolerate=True)
+        if isinstance(result, dict) and result.get("error"):
+            # Sessão órfã: o daemon que a abriu morreu e a linha ficou ativa.
+            console.print(f"[yellow]já parada[/] {row['id']} ({result['error']})")
+        else:
+            console.print(f"encerrada {row['id']}")
