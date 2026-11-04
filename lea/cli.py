@@ -836,11 +836,23 @@ def _api_call(method: str, path: str, tolerate: bool = False, **kwargs: Any) -> 
     return response.json() if response.content else None
 
 
-def _fleet_sessions() -> list[dict[str, Any]]:
-    """Sessões ativas que carregam a marca da frota no prompt de abertura."""
+def _project_label(project: Any) -> str:
+    """A listagem devolve o projeto como objeto, não como id."""
+    if isinstance(project, dict):
+        return str(project.get("slug") or project.get("name") or project.get("id") or "—")
+    return str(project or "—")
+
+
+def _fleet_sessions(only_active: bool = True) -> list[dict[str, Any]]:
+    """Sessões da frota, reconhecidas pela marca no prompt de abertura.
+
+    Por padrão só as que ainda rodam: listar as encerradas junto faria
+    `fleet status` crescer para sempre e esconder o que importa.
+    """
     body = _api_call("GET", "/api/sessions") or {}
     found = body.get("sessions", body) if isinstance(body, dict) else body
-    return [s for s in found if isinstance(s, dict) and fleet.is_fleet_session(s.get("task"))]
+    rows = [s for s in found if isinstance(s, dict) and fleet.is_fleet_session(s.get("task"))]
+    return [s for s in rows if s.get("status") == "active"] if only_active else rows
 
 
 @fleet_commands.command("up")
@@ -897,7 +909,7 @@ def fleet_status() -> None:
             str(row.get("harness") or "?"),
             str(row.get("id") or "?"),
             str(row.get("status") or "?"),
-            str(row.get("project_id") or "—"),
+            _project_label(row.get("project")),
         )
     console.print(table)
 

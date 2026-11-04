@@ -125,3 +125,17 @@ def test_nota_do_agy_nao_crava_versao():
 
     assert "1.4" not in NO_HOOKS
     assert "hooks" in NO_HOOKS
+
+
+def test_rotulo_do_projeto_aceita_objeto_e_texto():
+    """A listagem de sessões devolve o projeto como objeto, não como id.
+
+    Imprimir o dicionário cru espalhava três linhas de JSON dentro de uma
+    célula da tabela.
+    """
+    from lea.cli import _project_label
+
+    assert _project_label({"id": 1, "slug": "lea-core", "name": "lea-core"}) == "lea-core"
+    assert _project_label({"id": 7}) == "7"
+    assert _project_label(None) == "—"
+    assert _project_label("avulso") == "avulso"
