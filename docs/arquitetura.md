@@ -13,8 +13,8 @@ três coisas de uma vez:
 3. Trocar a camada visual depois não mexe no produto.
 
 ```
-agentes de código                      interface
-(claude, codex, …)                    (ainda a definir)
+agentes de código                      interfaces
+(claude, codex, agy)                  (dashboard · janela da LEA)
       │                                     │
       │ lea hook <evento>                   │ HTTP + WebSocket
       │ lea mcp (stdio)                     │ X-Lea-Token
@@ -38,6 +38,25 @@ agentes de código                      interface
   ~/.lea/lea.db         ~/.lea/wiki (git)
   índice, descartável   fonte da verdade
 ```
+
+## Interfaces
+
+Duas, e nenhuma fala com a outra:
+
+| | O que é | Como abre |
+|---|---|---|
+| Dashboard | HTML/JS servido pelo daemon em `/app/index.html` | navegador |
+| Janela da LEA | webview nativo sobre `/app/avatar.html` | `lea avatar` |
+
+Ambas assinam o mesmo `/ws` e recebem os mesmos eventos. É o que permite fechar
+uma sem afetar a outra, e abrir dois dashboards sem duplicar nada. Acoplar as
+duas diretamente seria mais curto e criaria uma ordem de inicialização entre
+elas; o barramento não cria nenhuma.
+
+O protótipo é servido pelo **próprio daemon**, e não por um servidor estático à
+parte, para ficar na mesma origem da API. Servir de outra porta exigiria abrir
+CORS, e aí qualquer página que o usuário visitasse poderia tentar falar com o
+daemon — escutar em 127.0.0.1 não autentica ninguém.
 
 ## Fonte da verdade
 
@@ -205,6 +224,15 @@ Prompts nativos de aprovação dos CLIs ainda não estão ligados ao agente pró
 - **Escrita em config de terceiro faz backup e merge.** Nunca sobrescreve.
 - **O hook nunca derruba a sessão do agente.** Daemon fora do ar = sai 0.
 - **Toda escrita na wiki é um commit.** É o que dá histórico e `git revert`.
+- **Sessão `active` de um processo morto é mentira.** O PTY pertence a quem o
+  abriu, então o daemon varre as órfãs ao subir (`sessions.reap_orphans`).
+- **Flag de CLI vem do config do servidor, nunca do corpo da requisição.**
+  Aceitar argv de um cliente deixaria qualquer portador do token anexar
+  argumento a um processo local.
+- **Credencial de serviço local do usuário passa; chave de provedor de modelo
+  não.** `AI_MEMORY_*` entra na lista branca de `_cli_environment()`, porque sem
+  ela o MCP de memória falha com 401 em silêncio. `OPENAI_API_KEY`,
+  `CODEX_API_KEY` e `ANTHROPIC_API_KEY` seguem fora.
 
 ## Testes
 
