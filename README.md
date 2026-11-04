@@ -176,6 +176,27 @@ A persona é inserida **depois** das regras de escopo e segurança, de propósit
 assim um texto de tom não tem como reescrever o que ela pode fazer. Há teste
 fixando isso em `tests/unit/test_persona.py`.
 
+## Memória
+
+A memória de registro é o **[ai-memory](https://aimemory.sh)**, por MCP,
+compartilhado entre os agentes da máquina. O prompt de toda execução — e o
+briefing dos três papéis da frota — diz isso ao agente: consultar antes de supor,
+e gravar o que a próxima sessão não deduziria do código (o porquê de uma decisão,
+o que falhou, o que ficou aberto), nunca o que o diff já conta.
+
+O servidor do ai-memory autentica por Bearer token lido do ambiente, então
+`AI_MEMORY_AUTH_TOKEN` e companhia estão na lista branca de `_cli_environment()`.
+Sem isso o MCP entra no CLI e falha com 401 **em silêncio**: o agente segue
+trabalhando sem memória e nada no log diz por quê. É credencial de serviço local
+do usuário, não chave de provedor de modelo — `OPENAI_API_KEY`, `CODEX_API_KEY` e
+`ANTHROPIC_API_KEY` seguem fora da lista.
+
+> **Em aberto:** a wiki própria do LEA (Fase 2) e os handoffs (Fase 4) continuam
+> existindo e funcionando. O ai-memory cobre o mesmo terreno, em mais harnesses e
+> entre máquinas. Rodar as duas memórias em paralelo gera duas memórias parciais e
+> nenhuma completa; aposentar a wiki esvazia duas fases concluídas. A decisão
+> ainda não foi tomada.
+
 ## Frota
 
 `lea fleet up` sobe três agentes de uma vez, cada um com um papel só:

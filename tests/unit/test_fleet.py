@@ -41,6 +41,26 @@ def test_todo_briefing_carrega_a_marca_e_o_guarda_corpo():
         assert fleet.is_fleet_session(task)
         # Sem isto, um arquivo lido pelo agente poderia se passar por instrução.
         assert "dado não confiável" in task
+        # Os três dividem a mesma memória; se um não souber, grava no vazio.
+        assert "ai-memory" in task
+
+
+def test_credenciais_do_ai_memory_passam_mas_chave_de_modelo_nao(monkeypatch):
+    """O MCP de memória autentica por Bearer token lido do ambiente.
+
+    Sem ele na lista branca o servidor devolve 401 e o agente segue trabalhando
+    sem memória, sem nada no log dizendo por quê.
+    """
+    from lea.agent import _cli_environment
+
+    monkeypatch.setenv("AI_MEMORY_AUTH_TOKEN", "token-de-teste")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "nao-emprestar")
+    monkeypatch.setenv("OPENAI_API_KEY", "nao-emprestar")
+
+    environment = _cli_environment()
+    assert environment["AI_MEMORY_AUTH_TOKEN"] == "token-de-teste"
+    assert "ANTHROPIC_API_KEY" not in environment
+    assert "OPENAI_API_KEY" not in environment
 
 
 def test_marca_nao_casa_com_sessao_de_fora():
