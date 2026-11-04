@@ -5,6 +5,47 @@ Enquanto o LEA não tem release, cada entrada é uma fase da especificação.
 
 ## [Não publicado]
 
+### Interface e orquestração
+
+- **A LEA ganhou janela própria** (`lea avatar`) e saiu do dashboard. É um
+  webview nativo sobre `/app/avatar.html`, servido pelo próprio daemon. As duas
+  interfaces não conversam entre si: assinam o mesmo `/ws`, então fechar uma não
+  afeta a outra. Extra opcional `desktop` (pywebview), escolhido no lugar de
+  Electron e Tauri para não trazer Chromium nem a cadeia do Node/Rust.
+- **Frota** (`lea fleet up/status/down`): sobe gerente (Codex), implementador
+  (Claude Code) e publicador (agy) de uma vez, cada um com um papel só. O papel
+  chega como prompt de abertura — o Launcher não injeta skill, isso é mecanismo
+  do `lea run`.
+- **Harness do Antigravity CLI** (`agy`). Não expõe hooks de ciclo de vida, e o
+  adaptador reporta a ausência em vez de fingir que estão lá.
+- Travas dos CLIs (`--yolo`, `--dangerously-skip-permissions`) em
+  `[fleet.flags]`, lidas pelo servidor e nunca aceitas no corpo da requisição.
+  Coleira do publicador ligada por padrão.
+- Persona da LEA em `agent.persona`, aplicada em toda execução e inserida
+  **depois** das regras de escopo, para tom não poder reescrever permissão.
+- Memória de registro passa a ser o **ai-memory**, por MCP.
+
+### Corrigido
+
+- Sessões ficavam `active` para sempre quando o daemon morria; o PTY ia junto e
+  `fleet status` listava agentes que não existiam. Varredura na subida.
+- `AI_MEMORY_*` não passava pela lista branca de ambiente dos CLIs, então o MCP
+  de memória falhava com 401 **em silêncio** no `lea run`.
+- Flags de CLI entravam depois do prompt posicional, onde vários CLIs já pararam
+  de ler flags.
+- `lea avatar` quebrava com traceback cru quando faltava o backend gráfico; agora
+  explica o pacote da distribuição, o `PYTHONPATH` e a saída pelo navegador.
+- Contraste da interface contra o fundo preto: 231 trocas de cor, molduras de
+  card de 1,38 para 3,03 de razão.
+
+### Removido
+
+- Pipeline de voxels do avatar (`lea-portrait.js`, `tools/build_portrait.py`),
+  órfão desde a reescrita do retrato.
+- Seletor de expressão e teste de fala do dashboard: a expressão é comandada
+  pelo agente, e um seletor manual seria um botão mentindo sobre quem decide.
+
+
 ### Fase 5 — base do agente, skills e cron (em andamento)
 
 - Agente próprio com backends Codex CLI, Claude Code e Anthropic API; sessão,
