@@ -72,6 +72,7 @@ lea harnesses  matriz de integração dos agentes; --install para configurar
 lea reindex    reconstrói o índice da memória a partir do git
 lea run        executa uma tarefa via Codex CLI, Claude Code ou Anthropic API
 lea fleet      sobe, acompanha e encerra a frota de três agentes
+lea avatar     abre a LEA numa janela própria, fora do navegador
 lea doctor     diagnostica a instalação
 ```
 
@@ -472,7 +473,7 @@ pelos testes.
 
 ## Interface & Telas do Projeto
 
-A interface do LEA é um centro de comando desktop com estética cyberpunk/terminal dark, combinando supervisão operacional em tempo real, navegação em grafos de conhecimento, terminal interativo e um **avatar em relevo WebGL (Three.js)** com sincronia labial e onda de áudio reativa.
+A interface do LEA é um centro de comando desktop com estética cyberpunk/terminal dark, combinando supervisão operacional em tempo real, navegação em grafos de conhecimento e terminal interativo. O **avatar em relevo WebGL (Three.js)**, com sincronia labial e onda de áudio reativa, roda numa janela separada (`lea avatar`).
 
 ```
 wireframe.html     protótipo, página única autocontida
@@ -567,9 +568,23 @@ Modal de inicialização rápida de agentes com configuração completa de conte
 
 ---
 
-### Painel Lateral & Avatar (LEA)
+### Avatar (LEA), em janela própria
 
-O painel lateral acompanha a navegação exibindo o avatar em relevo WebGL com a imagem de referência e o visualizador de onda de áudio. Suas quatro expressões reagem organicamente aos estados do agente:
+A LEA **não fica no dashboard**: ela tem uma janela só dela, aberta com
+`lea avatar`. É um webview nativo apontado para `/app/avatar.html`, servido pelo
+próprio daemon, com o relevo WebGL e a onda de áudio.
+
+As duas interfaces não conversam entre si — ambas assinam o mesmo websocket de
+eventos do daemon, que é o eixo. Fechar uma não afeta a outra.
+
+```bash
+uv sync --extra desktop    # traz o pywebview (webview do sistema, sem navegador empacotado)
+lea avatar                 # janela nativa
+lea avatar --on-top        # sempre sobre as outras
+lea avatar --browser       # mesma página, no navegador
+```
+
+Suas quatro expressões reagem aos estados do agente, sem seletor manual:
 
 - **Neutra (`neutral`)**: Estado de repouso com pulsos azuis saindo do implante óptico pelas trilhas de neon.
 - **Ouvindo (`listening`)**: Pulsos invertem a direção, fluindo para dentro da lente enquanto você digita ou grava áudio.

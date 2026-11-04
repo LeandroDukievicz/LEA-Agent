@@ -4,6 +4,30 @@ O elemento `<lea-avatar>` aplica `app/assets/lea-retrato.png` a uma malha subdiv
 
 O relevo é uma representação animada a partir de uma única imagem, não uma cabeça 3D integral com visão de todos os ângulos. Os olhos e a boca são deformações aproximadas da imagem original.
 
+## Onde ela aparece
+
+A LEA tem **janela própria** e saiu do dashboard:
+
+```bash
+lea avatar                 # janela nativa
+lea avatar --on-top        # sempre sobre as outras
+lea avatar --browser       # mesma página, no navegador (depuração)
+```
+
+A janela é um webview nativo apontado para `/app/avatar.html`, servido pelo
+próprio daemon. Ela **não conversa com o dashboard**: as duas assinam o mesmo
+websocket de eventos (`/ws`), e é de lá que vem a expressão. Fechar uma não
+afeta a outra, e abrir dois dashboards não duplica nada — o daemon é o eixo.
+
+Requer o extra `desktop` (`uv sync --extra desktop`), que traz o pywebview. Ele
+usa o webview que já existe no sistema em vez de empacotar um navegador; no
+Linux isso depende do PyGObject da distribuição, que não vem do pip — no Ubuntu,
+`gir1.2-webkit2-4.1`. Sem o extra, `lea avatar --browser` resolve.
+
+O cabeçalho da janela mostra se o websocket está mesmo ligado (`● ligada`,
+`◐ ligando`, `○ sozinha`). Sem esse sinal, uma janela desconectada fica idêntica
+a uma conectada e ociosa.
+
 ## Uso
 
 Carregue, nesta ordem, `assets/vendor/three.min.js` (Three.js, licença MIT em `assets/vendor/three.LICENSE`) e `assets/lea-avatar.js`; mantenha `lea-retrato.png` no mesmo diretório do último. Em seguida, adicione o elemento à página e defina suas dimensões por CSS:
@@ -64,7 +88,7 @@ Sem nenhuma fonte conectada, `expression="speaking"` roda uma fala simulada — 
 
 ## Imagem e efeitos
 
-O relevo usa diretamente a imagem transparente fornecida. Um shader ilumina as regiões coloridas dos circuitos com pulsos em movimento; em escuta, o sentido se inverte. O mapa `lea-portrait.js` e o gerador `tools/build_portrait.py` pertencem à versão anterior em voxels e não são carregados pelo avatar atual.
+O relevo usa diretamente a imagem transparente fornecida. Um shader ilumina as regiões coloridas dos circuitos com pulsos em movimento; em escuta, o sentido se inverte. A versão anterior, em voxels gerados por script, foi removida — está no histórico do git se um dia fizer falta.
 
 ## Comportamento
 

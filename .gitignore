@@ -13,6 +13,9 @@ Thumbs.db
 
 # Artefatos de teste de browser
 .playwright-mcp/
+before-*.png
+after-*.png
+check_*.png
 
 # Python
 __pycache__/
