@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LEA</title>
+<!--
+  A janela própria da LEA. Mesmos componentes do dashboard, sem nada em volta.
+
+  Ela não conversa com o dashboard: os dois assinam o mesmo websocket de eventos
+  do daemon, e é daí que vem a expressão. Fechar um não afeta o outro, e abrir
+  dois dashboards não duplica nada -- o daemon é o eixo.
+
+  `lea/desktop.py` carrega esta página num webview nativo. Abrir no navegador
+  também funciona e serve para depurar.
+-->
+<script src="assets/vendor/three.min.js"></script>
+<script src="assets/lea-avatar.js"></script>
+<script src="assets/lea-waveform.js"></script>
+<script src="assets/lea-presence.js" defer></script>
+<style>
+  :root{color-scheme:dark}
+  html,body{height:100%}
+  body{
+    margin:0;background:#000;color:#7e8c9b;overflow:hidden;
+    font:400 11px/1.4 'JetBrains Mono','DejaVu Sans Mono',monospace;
+    display:flex;flex-direction:column;
+  }
+  /* A barra inteira arrasta a janela: sem decoração do sistema, é o que resta
+     para mover a LEA pela tela. O botão precisa de `no-drag` para receber o
+     clique em vez de virar arrasto. */
+  header{
+    -webkit-app-region:drag;app-region:drag;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 14px 6px;color:#00f0ff;letter-spacing:.06em;user-select:none;
+  }
+  header button{-webkit-app-region:no-drag;app-region:no-drag}
+  main{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;padding:0 12px}
+  lea-avatar{flex:1 1 auto;min-height:0;display:block}
+  lea-waveform{flex:0 0 auto;height:96px;margin-top:6px}
+  footer{
+    flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+    gap:12px;flex-wrap:wrap;padding:10px 12px 14px;
+  }
+  button{
+    cursor:pointer;background:#000;border:1px solid #00f0ff;color:#00f0ff;
+    padding:8px 14px;font:600 11px/1.2 inherit;letter-spacing:.05em;
+  }
+  button:hover{background:#00f0ff;color:#000}
+  button:disabled{opacity:.45;cursor:default}
+  #estado{color:#7e8c9b;font-size:10px}
+  /* Sem daemon a janela ficaria preta e muda; isto diz o que houve. */
+  #offline{display:none;padding:0 16px 16px;text-align:center;color:#677b8e}
+  body.sem-daemon #offline{display:block}
+</style>
+</head>
+<body>
+  <header>
+    <span>┌─ AGENT LEA ─┐</span>
+    <span id="vinculo" title="Ligação com o daemon">○ sozinha</span>
+  </header>
+
+  <main>
+    <lea-avatar id="lea-face"></lea-avatar>
+    <lea-waveform avatar="#lea-face"></lea-waveform>
+  </main>
+
+  <footer>
+    <button type="button" data-lea-test-speech="true">▶ HABILITAR FALA</button>
+    <span id="estado" data-lea-speech-status="true" role="status" aria-live="polite"></span>
+  </footer>
+
+  <div id="offline">
+    Daemon fora do ar. Suba com <strong>lea daemon</strong> — a janela reconecta sozinha.
+  </div>
+
+<script>
+// Espelha no cabeçalho se a LEA está mesmo ouvindo o daemon. Sem isso, uma
+// janela desconectada fica idêntica a uma conectada e ociosa.
+(() => {
+  const marca = document.getElementById('vinculo');
+  const estados = {
+    0: ['◐ ligando', '#f5ff3b'],
+    1: ['● ligada', '#39ff88'],
+    2: ['◐ caindo', '#f5ff3b'],
+    3: ['○ sozinha', '#677b8e'],
+  };
+  setInterval(() => {
+    const socket = window.LeaPresence && window.LeaPresence.socket;
+    const [texto, cor] = estados[socket ? socket.readyState : 3];
+    marca.textContent = texto;
+    marca.style.color = cor;
+    document.body.classList.toggle('sem-daemon', !socket || socket.readyState > 1);
+  }, 1000);
+})();
+</script>
+</body></html>

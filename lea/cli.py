@@ -770,6 +770,35 @@ if __name__ == "__main__":
     main()
 
 
+
+@app.command("avatar")
+def open_avatar(
+    browser: bool = typer.Option(False, "--browser", help="Abre no navegador em vez da janela nativa."),
+    on_top: bool = typer.Option(False, "--on-top", help="Mantém a janela sobre as outras."),
+    fullscreen: bool = typer.Option(False, "--fullscreen", help="Abre em tela cheia."),
+) -> None:
+    """Abre a LEA numa janela só dela, fora do navegador.
+
+    A janela é cliente do daemon como qualquer outra interface: ela assina o
+    mesmo websocket de eventos que o dashboard, então as duas acompanham os
+    agentes sem saber uma da outra.
+    """
+    from lea import desktop
+
+    config = load()
+    console.print(f"LEA em [cyan]{config.server.host}:{config.server.port}[/]")
+    if browser:
+        desktop.open_in_browser()
+        console.print("aberta no navegador.")
+        return
+    try:
+        desktop.run(fullscreen=fullscreen, on_top=on_top)
+    except RuntimeError as exc:
+        err_console.print(f"[red]{exc}[/]")
+        console.print("Enquanto isso: [cyan]lea avatar --browser[/]")
+        raise typer.Exit(1) from None
+
+
 # ── frota ────────────────────────────────────────────────────────────────
 
 

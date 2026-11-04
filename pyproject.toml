@@ -45,6 +45,11 @@ lea = "lea.cli:main"
 discord = [
   "discord.py==2.7.1",
 ]
+# Janela própria da LEA. Usa o webview do sistema, sem empacotar navegador.
+# No Linux depende do PyGObject da distribuição, que não vem do pip.
+desktop = [
+  "pywebview==6.2.1",
+]
 dev = [
   "pytest==9.0.1",
   "pytest-asyncio==1.3.0",
