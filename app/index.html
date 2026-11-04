@@ -276,7 +276,6 @@ input::placeholder{color:#7e8c9b}
 html,.lea-scroll{scrollbar-gutter:stable}
 /* ═════════ LAYOUT · grade principal ═════════ */
 .lea-shell{width:100%;grid-template-columns:232px minmax(0,1fr)}
-  height:calc(100vh - 28px);height:calc(100dvh - 28px);display:flex;flex-direction:column;justify-content:center}
 .lea-main{min-width:0;display:flex;flex-direction:column}
 .lea-head{min-width:0}
 .lea-head>span:first-child,.lea-head h1,.lea-head-time{flex:none;white-space:nowrap}
@@ -286,8 +285,8 @@ html,.lea-scroll{scrollbar-gutter:stable}
 .lea-main-body{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;padding:24px 28px 34px}
 /* cada aba ocupa toda a altura livre; se o conteúdo passar disso, o documento rola */
 .lea-main-body>*{flex:1 1 auto;min-width:0;min-height:0}
-/* painéis presos à viewport: o histórico rola dentro do painel, nunca o documento */
-.lea-console,.lea-memoria{flex:1 1 0;min-height:380px}
+/* painéis presos à viewport: o conteúdo rola dentro do painel, nunca o documento */
+.lea-console,.lea-memoria,.lea-sessoes{flex:1 1 0;min-height:380px}
 .lea-footer{overflow:hidden;white-space:nowrap}
 .lea-footer>span{min-width:0}
 .lea-nowrap{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -297,18 +296,18 @@ html,.lea-scroll{scrollbar-gutter:stable}
 .lea-push{margin-top:auto}
 
 /* ── 01 OVERVIEW ── */
-.lea-overview{display:grid;gap:16px;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(300px,420px);grid-template-rows:max-content auto auto;align-content:stretch}
+.lea-overview{display:grid;gap:16px;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(320px,480px);grid-template-rows:max-content auto auto;align-content:stretch}
 .lea-stats{grid-column:1 / -1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
 .lea-stats>div{justify-content:space-between}
 .lea-agents{grid-column:1 / 3;display:flex;flex-direction:column;min-width:0}
-.lea-agents-row{display:grid;grid-template-columns:28px minmax(0,1.5fr) 84px 62px minmax(0,1fr) 112px 58px;gap:10px}
+.lea-agents-row{display:grid;grid-template-columns:28px minmax(0,1.4fr) 84px 62px minmax(0,1fr) minmax(112px,0.6fr) 58px;gap:10px}
 .lea-agents-row>*{min-width:0}
 .lea-agents-row>span,.lea-agents-row>span>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.lea-agents>div:nth-child(n+3){flex:1 1 auto;min-height:38px}
+.lea-agents>div:nth-child(n+3){flex:1 1 auto;min-height:38px;max-height:76px}
 .lea-activity{grid-column:3;grid-row:2 / 4;min-height:0}
 .lea-activity-list{height:0;flex:1 1 auto;min-height:0;overflow:hidden auto}
 .lea-tokens>div:nth-child(2){flex:1 1 auto;justify-content:center}
-.lea-cron>div:nth-child(n+2){flex:1 1 auto;min-height:34px}
+.lea-cron>div:nth-child(n+2){flex:1 1 auto;min-height:34px;max-height:92px}
 .lea-cost-row{display:grid;grid-template-columns:28px minmax(0,1fr) 64px}
 .lea-cost-row>span:nth-child(2){overflow:hidden}
 
@@ -332,7 +331,7 @@ html,.lea-scroll{scrollbar-gutter:stable}
 .lea-run-row>:nth-child(7){grid-area:acoes;justify-content:flex-end}
 
 /* ── 03 CONSOLE ── */
-.lea-console{display:grid;gap:16px;grid-template-columns:minmax(0,1fr) minmax(260px,320px)}
+.lea-console{display:grid;gap:16px;grid-template-columns:minmax(0,1fr) minmax(260px,340px)}
 .lea-console-aside{display:flex;flex-direction:column;gap:16px;min-width:0}
 .lea-console-aside>section:last-child{flex:1 1 auto}
 
@@ -345,91 +344,111 @@ html,.lea-scroll{scrollbar-gutter:stable}
 .lea-skills{display:flex;flex-direction:column;gap:16px}
 .lea-skills-head{display:flex;align-items:center;gap:24px;flex-wrap:wrap}
 .lea-skills-head>div{flex-wrap:wrap;min-width:0}
-.lea-skills-grid{flex:1 1 auto;display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));grid-auto-rows:auto;align-content:stretch}
+/* a coluna acompanha a largura da janela: em telas largas o card cresce em vez de
+   multiplicar colunas, senão sobram poucas linhas muito esticadas */
+.lea-skills-grid{flex:1 1 auto;display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(min(100%,clamp(300px,24vw,460px)),1fr));grid-auto-rows:auto;align-content:stretch}
 .lea-skills-grid>article>div:last-child{margin-top:auto}
 
 /* ── 06 HISTÓRICO & HANDOFFS ── */
-.lea-sessoes{display:grid;gap:16px;grid-template-columns:minmax(0,1fr) minmax(360px,460px)}
+.lea-sessoes{display:grid;gap:16px;grid-template-columns:minmax(0,1fr) minmax(380px,500px)}
+/* cada coluna rola por dentro: a linha do tempo e a fila de handoffs têm alturas
+   bem diferentes e uma não pode esticar a outra nem empurrar o documento */
+.lea-sessoes>section,.lea-sessoes>div{min-height:0;overflow:auto}
 
 /* ── 07 AUTOMAÇÕES ── */
 .lea-auto{display:flex;flex-direction:column;gap:16px}
 .lea-auto-new{flex-wrap:wrap}
 .lea-auto-tasks{flex:1 1 auto;display:flex;flex-direction:column}
-.lea-auto-tasks>div:nth-child(n+3){flex:1 1 auto;min-height:34px}
+.lea-auto-tasks>div:nth-child(n+3){flex:1 1 auto;min-height:34px;max-height:76px}
+/* a sobra de altura vai para o log em vez de inflar as linhas da tabela */
+.lea-auto>section:last-child{flex:1 1 auto;min-height:170px}
 .lea-cron-row{display:grid;grid-template-columns:minmax(0,1fr) 126px 124px 96px 190px;gap:14px}
 
 /* ── 08 CANAIS & AGENTES ── */
 .lea-canais{display:flex;flex-direction:column;gap:16px}
 .lea-matrix{display:flex;flex-direction:column;flex:1 1 auto;overflow-x:auto}
-.lea-matrix>div:nth-child(n+3){flex:1 1 auto;min-height:34px}
+.lea-matrix>div:nth-child(n+3){flex:1 1 auto;min-height:34px;max-height:76px}
 .lea-matrix-row{display:grid;grid-template-columns:28px minmax(150px,1.2fr) 76px repeat(4,82px) 62px 82px 82px minmax(96px,1fr);gap:10px;min-width:1012px}
 .lea-platforms{flex:1 1 auto;display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(236px,1fr))}
 
 /* ── modais ── */
 .lea-modal-box{box-sizing:border-box;width:min(604px,calc(100vw - 40px))}
-.lea-launcher-box{box-sizing:border-box;width:min(950px,calc(100vw - 40px));max-height:calc(100vh - 56px);max-height:calc(100dvh - 56px)}
+.lea-launcher-box{box-sizing:border-box;width:min(1040px,calc(100vw - 40px));max-height:calc(100vh - 56px);max-height:calc(100dvh - 56px)}
 
 /* ═════════ RESPONSIVO ═════════ */
-/* 1800px: a coluna do texto da wiki fica estreita demais com três colunas */
-@media (max-width:1800px){
+/* Sem o painel do avatar o conteúdo passou a valer (largura da janela − 232px da
+   barra lateral − respiro). Os cortes abaixo olham para essa largura útil, não
+   para a janela que existia quando o avatar ocupava a terceira coluna. */
+
+/* ≥1600px: a linha do agente cabe inteira, botões inclusive, numa linha só */
+@media (min-width:1600px){
+  .lea-run-row{grid-template-columns:28px minmax(130px,1fr) 92px minmax(190px,1.8fr) 104px 58px auto;
+    grid-template-areas:"badge nome status tarefa ctx tok acoes"}
+}
+/* ≥1560px: a matriz de hooks para de empilhar folga em duas colunas elásticas e
+   distribui a largura entre as colunas de hook */
+@media (min-width:1560px){
+  .lea-matrix-row{grid-template-columns:28px minmax(150px,1.1fr) 84px repeat(4,minmax(82px,0.78fr)) minmax(62px,0.6fr) minmax(82px,0.78fr) minmax(82px,0.78fr) minmax(96px,1fr)}
+}
+/* ≥1750px: sobra largura para a árvore da wiki não truncar nome de página e para
+   a coluna de metadados respirar, sem esticar a coluna de texto (máx. 760px) */
+@media (min-width:1750px){
+  .lea-memoria{grid-template-columns:minmax(236px,300px) minmax(0,1fr) minmax(300px,400px)}
+}
+/* 1575px: abaixo disso a coluna do texto da wiki cai de 700px com três colunas */
+@media (max-width:1575px){
   .lea-memoria{grid-template-columns:minmax(200px,236px) minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto}
   .lea-mem-aside{grid-column:1 / -1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;overflow:visible}
   .lea-mem-aside>section:last-child{flex:0 1 auto}
 }
-/* 1560px: com o conteúdo abaixo de ~950px as colunas laterais estrangulam
-   conversa, linha do tempo e tabela de agentes */
-@media (max-width:1560px){
-  /* console e histórico passam a usar a largura inteira; o aside vira faixa */
-  .lea-sessoes{grid-template-columns:minmax(0,1fr)}
-  .lea-console{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto}
-  .lea-console-aside{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start}
-  .lea-console-aside>section:last-child{flex:0 1 auto}
-  /* em três colunas a tabela de agentes fica com ~450px e as células se atropelam:
-     ela ocupa a largura inteira e o feed desce para a coluna da direita */
-  .lea-overview{grid-template-columns:minmax(0,1fr) minmax(300px,380px);grid-template-rows:max-content auto auto auto}
+/* 1420px: com menos que isso a tabela de agentes fica abaixo de ~700px em três
+   colunas e as células se atropelam; a linha do tempo também estrangula o aside */
+@media (max-width:1420px){
+  /* a tabela de agentes ocupa a largura inteira e o feed desce para a direita */
+  .lea-overview{grid-template-columns:minmax(0,1fr) minmax(300px,400px);grid-template-rows:max-content auto auto auto}
   .lea-agents{grid-column:1 / -1}
-  /* 4 cartões em ~190px quebram rótulo e número no meio */
-  .lea-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
   .lea-activity{grid-column:2;grid-row:3 / 5;min-height:300px}
   .lea-tokens{grid-column:1;grid-row:3}
   .lea-cron{grid-column:1;grid-row:4}
+  /* histórico passa a usar a largura inteira; as colunas voltam a empilhar */
+  .lea-sessoes{grid-template-columns:minmax(0,1fr);flex:1 1 auto;min-height:0}
+  .lea-sessoes>section,.lea-sessoes>div{overflow:visible}
 }
-/* 1460px: encolhe colunas laterais, tabelas e respiro geral */
-@media (max-width:1460px){
+/* 1300px: encolhe colunas laterais, tabelas e respiro geral */
+@media (max-width:1300px){
   .lea-main-body{padding:20px 20px 30px}
   .lea-projetos{grid-template-columns:252px minmax(0,1fr)}
   .lea-cron-row{grid-template-columns:minmax(0,1fr) 108px 108px 84px 152px;gap:10px}
   .lea-footer{gap:12px}
+  /* a conversa cairia abaixo de ~640px: o aside vira faixa sob o console */
+  .lea-console{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto}
+  .lea-console-aside{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start}
+  .lea-console-aside>section:last-child{flex:0 1 auto}
 }
-/* 1280px: três colunas não cabem — avatar sai da lateral e vai para baixo */
+/* 1150px: 4 cartões em ~190px quebram rótulo e número no meio */
+@media (max-width:1150px){
+  .lea-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .lea-projetos{grid-template-columns:230px minmax(0,1fr)}
+  .lea-overview{grid-template-columns:minmax(0,1fr)}
+  .lea-activity{grid-column:1;grid-row:auto;min-height:260px}
+  .lea-tokens,.lea-cron{grid-column:1;grid-row:auto}
+  .lea-overview,.lea-console,.lea-memoria{flex:1 1 auto;min-height:0}
+  .lea-mem-aside{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .lea-console>section{height:min(74vh,720px);min-height:420px}
+  .lea-memoria>section:nth-of-type(1){height:min(40vh,420px)}
+  .lea-memoria>section:nth-of-type(2){height:min(74vh,720px);min-height:420px}
+}
+/* a barra de rodapé é da largura da janela, não do conteúdo */
 @media (max-width:1279px){
-  .lea-shell{grid-template-columns:232px minmax(0,1fr)}
-  .lea-navigation{grid-column:1;grid-row:1 / span 2}
-  /* o conteúdo vem primeiro: o avatar ocuparia a janela inteira antes da aba */
-  .lea-shell>main{grid-column:2;grid-row:1}
-      .lea-projetos{grid-template-columns:230px minmax(0,1fr)}
-  /* com o avatar no fluxo o documento rola: os painéis deixam de ser presos à
-     viewport e passam a limitar a própria altura */
-  .lea-console,.lea-memoria{flex:1 1 auto;min-height:0}
-  .lea-console>section{height:min(74vh,720px);min-height:440px}
-  .lea-memoria>section:nth-of-type(1){height:min(56vh,520px)}
-  .lea-memoria>section:nth-of-type(2){height:min(74vh,720px);min-height:440px}
   .lea-footer>span:nth-child(5),.lea-footer>span:nth-child(6){display:none}
 }
 /* janela baixa: nenhum painel pode ultrapassar a altura da janela */
 @media (max-height:760px){
   .lea-main-body{padding:16px 20px 24px}
-  .lea-console,.lea-memoria{min-height:320px}
+  .lea-console,.lea-memoria,.lea-sessoes{min-height:320px}
   .lea-skills-grid{align-content:start}
-}
-/* acima de 1850px a linha do agente cabe inteira numa linha só */
-@media (min-width:1850px){
-  .lea-run-row{grid-template-columns:28px minmax(130px,1fr) 92px minmax(190px,1.9fr) 104px 58px;
-    grid-template-areas:"badge nome status tarefa ctx tok" "acoes acoes acoes acoes acoes acoes"}
-}
-/* telas muito largas: cards de skill maiores, senão sobram colunas e falta linha */
-@media (min-width:2200px){
-  .lea-skills-grid{grid-template-columns:repeat(auto-fill,minmax(420px,1fr))}
+  .lea-agents>div:nth-child(n+3){max-height:none}
+  .lea-auto-tasks>div:nth-child(n+3),.lea-matrix>div:nth-child(n+3){max-height:none}
 }
 @keyframes leaBlink{0%,50%{opacity:1}50.01%,100%{opacity:0}}
 @keyframes leaIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
@@ -752,7 +771,7 @@ html,.lea-scroll{scrollbar-gutter:stable}
 <!-- 03 SESSÕES & HANDOFFS -->
 <sc-if value="{{ isSessoes }}" hint-placeholder-val="{{ false }}">
 <div class="lea-sessoes">
-  <section style="background:#000;border:1px solid #475c70;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 18px">
+  <section class="lea-scroll" style="background:#000;border:1px solid #475c70;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);padding:14px 18px">
     <div class="lea-wrap" style="display:flex;justify-content:space-between;align-items:center;gap:10px;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#00f0ff;margin-bottom:14px">
       <span>┌─ LINHA DO TEMPO ─┐</span>
       <div style="display:flex;gap:6px">
@@ -785,7 +804,7 @@ html,.lea-scroll{scrollbar-gutter:stable}
     </sc-for>
   </section>
 
-  <div style="display:flex;flex-direction:column;gap:14px">
+  <div class="lea-scroll" style="display:flex;flex-direction:column;gap:14px">
     <div style="display:flex;justify-content:space-between;align-items:baseline;font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.06em;color:#ff2bd6"><span>┌─ HANDOFFS PENDENTES ─┐</span><span style="color:#7e8c9b">{{ pendingCount }} aguardando</span></div>
     <sc-for list="{{ handoffs }}" as="h" hint-placeholder-count="3">
       <article style="background:#000;border:1px solid {{ h.border }};clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px);padding:16px 18px;display:flex;flex-direction:column;gap:12px;box-shadow:{{ h.shadow }};opacity:{{ h.opacity }}">
