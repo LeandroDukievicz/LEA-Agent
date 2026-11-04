@@ -33,7 +33,7 @@ homelab e trocar a camada visual sem mexer no produto.
 |---|---|
 | ✅ Fase 1 | núcleo: config, banco com migrações, barramento de eventos, CLI, tokens locais, scanner de injeção |
 | ✅ Fase 2 | memória: wiki git, busca FTS, decaimento, grafo, injeção de contexto, servidor MCP |
-| ✅ Fase 3 | projetos, launcher, adaptadores de harness, hooks, PTY, worktrees |
+| ✅ Fase 3 | projetos, launcher, adaptadores de harness (Claude Code, Codex, agy), hooks, PTY, worktrees, frota |
 | ✅ Fase 4 | handoffs: geração no Stop, claim, injeção no contexto |
 | 🟡 Fase 5 | lea-agent, skills e cron — aprovações nativas dos CLIs pendentes |
 | ✅ Fase 6 | bots Telegram e Discord com allowlist e rotas por projeto |
@@ -49,7 +49,7 @@ Requer Python 3.12+ e [uv](https://docs.astral.sh/uv/).
 uv sync --extra dev
 uv run lea doctor      # confere instalação, permissões e banco
 uv run lea daemon      # sobe o núcleo em 127.0.0.1:7420
-uv run pytest          # 223 testes (unidade + aceite)
+uv run pytest          # 228 testes (unidade + aceite)
 ```
 
 Testes de aceite exercitam o LEA pela borda — HTTP, WebSocket, MCP por stdio,
@@ -80,9 +80,10 @@ lea doctor     diagnostica a instalação
 
 ```
 $ lea harnesses
-agente          versão                 hooks  mcp  observação
-CC Claude Code  2.1.278 (Claude Code)  ●      ●
-CX Codex CLI    codex-cli 0.164.0      ◐      ●    1 hook aguardando confiança
+agente              versão                 hooks  mcp  observação
+CC Claude Code      2.1.278 (Claude Code)  ●      ●
+CX Codex CLI        codex-cli 0.166.0      ◐      ●    1 hook aguardando confiança
+AG Antigravity CLI  1.4.12                 ○      ●    não expõe hooks de ciclo de vida
 ```
 
 `lea harnesses --install claude-code` registra os hooks de ciclo de vida

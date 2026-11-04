@@ -10,14 +10,14 @@ para programar de memória:
   ``agy mcp add [flags] <nome> <comando> [args...]``: sem ``--scope`` e sem o
   ``--`` separador que o Claude Code exige.
 
-**O agy não expõe hooks de ciclo de vida.** A versão 1.4.10 não tem nenhuma
-menção a hook em ``agy --help``, e o ``settings.json`` não tem a chave. Isso
-não é um defeito da instalação: é o que o CLI oferece hoje. Então a sessão de
-agy aparece no LEA pelo que sai no PTY e pelo que ela grava na memória via
-MCP, e não pelos eventos estruturados que Claude Code e Codex entregam. O
-adaptador reporta isso como ausência explícita em vez de fingir que está lá,
-porque supervisionar sem saber que o canal não existe é pior que não
-supervisionar.
+**O agy não expõe hooks de ciclo de vida.** Verificado na 1.4.10: nenhuma
+menção a hook em ``agy --help``, e o ``settings.json`` sem a chave. Não é
+defeito da instalação, é o que o CLI oferece -- se uma versão futura passar a
+ter, é aqui que se acrescenta. Enquanto não tiver, a sessão de agy aparece no
+LEA pelo que sai no PTY e pelo que ela grava na memória via MCP, e não pelos
+eventos estruturados que Claude Code e Codex entregam. O adaptador reporta isso
+como ausência explícita em vez de fingir que está lá, porque supervisionar sem
+saber que o canal não existe é pior que não supervisionar.
 """
 
 from __future__ import annotations
@@ -41,7 +41,10 @@ logger = logging.getLogger(__name__)
 MCP_NAME = "lea-memory"
 
 #: Motivo repetido em `install` e `status`, para os dois dizerem a mesma coisa.
-NO_HOOKS = "agy 1.4.10 não expõe hooks de ciclo de vida; a sessão é observada pelo PTY"
+#: Sem número de versão cravado: a observação foi feita na 1.4.10, mas o texto
+#: aparece ao lado da versão detectada e envelheceria sozinho a cada atualização
+#: do CLI -- já aconteceu uma vez.
+NO_HOOKS = "não expõe hooks de ciclo de vida; a sessão é observada pelo PTY"
 
 
 class Agy(Harness):

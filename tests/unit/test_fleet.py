@@ -112,3 +112,16 @@ async def test_varredura_encerra_sessao_orfa(db_path):
 
         # Idempotente: subir o daemon duas vezes não pode reescrever nada.
         assert await sessions.reap_orphans(conn) == 0
+
+
+def test_nota_do_agy_nao_crava_versao():
+    """A nota aparece ao lado da versão detectada pelo próprio adaptador.
+
+    Cravar o número ali faz o texto envelhecer sozinho a cada atualização do
+    CLI -- aconteceu entre a 1.4.10 e a 1.4.12, e a matriz passou a mostrar
+    "agy 1.4.10 não expõe..." na linha de uma instalação 1.4.12.
+    """
+    from lea.harnesses.agy import NO_HOOKS
+
+    assert "1.4" not in NO_HOOKS
+    assert "hooks" in NO_HOOKS
