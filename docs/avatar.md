@@ -19,10 +19,22 @@ próprio daemon. Ela **não conversa com o dashboard**: as duas assinam o mesmo
 websocket de eventos (`/ws`), e é de lá que vem a expressão. Fechar uma não
 afeta a outra, e abrir dois dashboards não duplica nada — o daemon é o eixo.
 
-Requer o extra `desktop` (`uv sync --extra desktop`), que traz o pywebview. Ele
-usa o webview que já existe no sistema em vez de empacotar um navegador; no
-Linux isso depende do PyGObject da distribuição, que não vem do pip — no Ubuntu,
-`gir1.2-webkit2-4.1`. Sem o extra, `lea avatar --browser` resolve.
+Requer o extra `desktop` (`uv sync --extra dev --extra desktop`), que traz o
+pywebview. Ele usa o webview que já existe no sistema em vez de empacotar um
+navegador. Sem o extra, `lea avatar --browser` resolve.
+
+No Linux há uma pegadinha: o pywebview não traz backend gráfico — ele usa o
+WebKitGTK pelo PyGObject, que vem da distribuição e **não existe no PyPI**. Um
+venv comum não enxerga pacote de sistema, então instalar o extra não basta:
+
+```bash
+sudo apt install gir1.2-webkit2-4.1 python3-gi
+PYTHONPATH=/usr/lib/python3/dist-packages lea avatar
+```
+
+`lea avatar` detecta essa situação e imprime exatamente esses passos em vez do
+traceback do pywebview, que não menciona nenhum deles.
+
 
 O cabeçalho da janela mostra se o websocket está mesmo ligado (`● ligada`,
 `◐ ligando`, `○ sozinha`). Sem esse sinal, uma janela desconectada fica idêntica

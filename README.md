@@ -578,11 +578,17 @@ As duas interfaces não conversam entre si — ambas assinam o mesmo websocket d
 eventos do daemon, que é o eixo. Fechar uma não afeta a outra.
 
 ```bash
-uv sync --extra desktop    # traz o pywebview (webview do sistema, sem navegador empacotado)
-lea avatar                 # janela nativa
-lea avatar --on-top        # sempre sobre as outras
-lea avatar --browser       # mesma página, no navegador
+uv sync --extra dev --extra desktop   # traz o pywebview (webview do sistema)
+lea avatar                            # janela nativa
+lea avatar --on-top                   # sempre sobre as outras
+lea avatar --browser                  # mesma página, no navegador
 ```
+
+No Linux o pywebview não traz backend gráfico: usa o WebKitGTK pelo PyGObject,
+que vem da distribuição e não do PyPI. Um venv comum não o enxerga, então
+`sudo apt install gir1.2-webkit2-4.1 python3-gi` e
+`PYTHONPATH=/usr/lib/python3/dist-packages lea avatar`. O comando detecta isso e
+imprime os passos em vez do traceback do pywebview, que não menciona nenhum.
 
 Suas quatro expressões reagem aos estados do agente, sem seletor manual:
 

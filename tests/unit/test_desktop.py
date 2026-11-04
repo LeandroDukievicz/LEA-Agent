@@ -18,8 +18,7 @@ def test_sem_token_a_url_nao_carrega_query_vazia(lea_home):
 
 
 def test_sem_pywebview_a_mensagem_ensina_a_instalar(monkeypatch):
-    """Sem o extra, a falha tem que dizer o que fazer -- inclusive o pacote da
-    distribuição, que é a parte que ninguém adivinha no Linux."""
+    """Sem o extra, a falha tem que dizer qual extra instalar."""
     import builtins
 
     real_import = builtins.__import__
@@ -33,4 +32,15 @@ def test_sem_pywebview_a_mensagem_ensina_a_instalar(monkeypatch):
     with pytest.raises(RuntimeError) as erro:
         desktop.run()
     assert "--extra desktop" in str(erro.value)
-    assert "gir1.2-webkit2-4.1" in str(erro.value)
+
+
+def test_sem_backend_grafico_a_mensagem_cobre_a_pegadinha_do_linux():
+    """O pywebview instala sem backend: no Linux ele depende do PyGObject da
+    distribuição, que não existe no PyPI e que um venv comum não enxerga.
+
+    O traceback dele não diz nada disso, então a tradução é o que separa
+    "resolvo em um minuto" de "por que a janela não abre".
+    """
+    assert "gir1.2-webkit2-4.1" in desktop.NO_GUI_BACKEND
+    assert "PYTHONPATH" in desktop.NO_GUI_BACKEND
+    assert "--browser" in desktop.NO_GUI_BACKEND

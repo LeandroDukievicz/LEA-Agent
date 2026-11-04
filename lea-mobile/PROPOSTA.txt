@@ -1,0 +1,494 @@
+LEA NO CELULAR — PROPOSTA DE PESQUISA
+Pesquisa feita em novembro de 2026. Nenhum código foi alterado; este é o único
+arquivo deste pacote.
+
+
+1. RESUMO DA RECOMENDAÇÃO
+--------------------------------------------------------------------------
+Empacotamento: um PWA (Progressive Web App) instalável, construído em cima do
+app/ que já existe — app/avatar.html e o dashboard são HTML/JS hoje; vira PWA
+só adicionando manifest + service worker, sem reescrever nada em outra
+linguagem e sem novo toolchain de build.
+
+Acesso remoto: Tailscale. Ele não expõe o daemon à internet — cria uma rede
+privada entre os dispositivos que você autoriza, usando WireGuard por baixo.
+O celular alcança 127.0.0.1:7420 da sua casa como se estivesse na mesma LAN,
+e mais ninguém alcança. Cloudflare Tunnel e ngrok colocam um hostname público
+na frente de uma API que executa comandos; Tailscale não coloca hostname
+público nenhum.
+
+O ponto técnico decisivo: Tailscale resolve de brinde o requisito de HTTPS
+que Service Worker e Web Push exigem (tailscale cert / Tailscale Serve emite
+certificado Let's Encrypt real para o nó, sem o daemon mudar uma linha).
+Cloudflare Tunnel e ngrok também dão HTTPS, mas ao preço de um hostname
+público — exatamente o que se quer evitar aqui.
+
+Notificação sem aprovação pendente ficar muda: Web Push com VAPID própria do
+daemon, sem SaaS de push (sem Firebase, sem OneSignal). Mas atenção: "sem
+terceiro" é parcial — a entrega ainda atravessa o serviço de push do
+navegador (Google para Chrome/Android, Apple para Safari/iOS, Mozilla para
+Firefox). Isso é a cada um deles ser **parte do protocolo Web Push**, com
+você não abrindo conta nem integrando SDK nenhum — diferente de depender de
+uma Firebase. É a opção mais próxima de "zero terceiro" que existe para isto.
+
+Avatar: mantém, com um perfil de render mais leve para celular (menos pulsos
+de shader, fps travado em 30, textura já comprimida). Three.js/WebGL roda em
+navegador móvel moderno; o risco é bateria e thermal throttling em sessão
+longa, não falta de suporte.
+
+
+2. EMPACOTAMENTO — COMPARAÇÃO
+--------------------------------------------------------------------------
+
+PWA instalável (recomendado)
+  Prós: reaproveita 100% do HTML/JS existente (app/avatar.html,
+  lea-avatar.js, lea-presence.js). Zero dependência nova no núcleo Python —
+  mesma filosofia do pyproject.toml ("menos dependência no núcleo = menor
+  raio de explosão no próximo ataque de cadeia de suprimentos") e do
+  lea/desktop.py, que escolheu pywebview sobre Electron/Tauri pelo mesmo
+  motivo. Instala na tela inicial, abre em tela cheia, funciona offline para
+  o shell da página (service worker fazendo cache).
+  Contras: no iOS, instalação é manual (usuário tem que saber tocar em
+  "Adicionar à Tela de Início" — Safari não oferece prompt de instalação
+  como o Chrome no Android). Sem Background Sync/Fetch em nenhuma das duas
+  plataformas — nada atualiza com o app fechado além de notificação push.
+  Sem acesso a Keychain/Keystore nativo — o token do celular fica em
+  armazenamento do navegador (localStorage/IndexedDB), mais fraco que
+  armazenamento seguro de hardware.
+  Custo: zero em dinheiro. Custo de engenharia é o menor das opções —
+  manifest.json, um service worker, ícones.
+
+Capacitor (wrapper nativo sobre o mesmo HTML/JS)
+  Prós: mesmo ponto de partida do PWA (reaproveita o app/ quase sem
+  mudança), mas abre a porta para armazenamento seguro nativo
+  (Keychain/Keystore via plugin), push nativo via FCM/APNs em vez de Web
+  Push, e distribuição pela App Store/Play Store se algum dia isso importar.
+  Contras: traz toolchain Node + Gradle/Xcode para o projeto, que hoje é só
+  Python + navegador. Exige conta de desenvolvedor Apple (paga, anual) para
+  publicar ou mesmo para instalar em iPhone fora de um ambiente de teste.
+  Mantém duas superfícies de build (PWA e app nativo) se quiser as duas.
+  Custo: tempo de configurar o wrapper e as contas de loja; sem custo de
+  licença para rodar local/testar, mas conta Apple Developer é paga por ano
+  se quiser instalar no próprio iPhone fora do modo de desenvolvimento.
+
+React Native
+  Prós: UI nativa de verdade (não é WebView), bom se o celular um dia
+  precisar de interação muito mais rica que o dashboard atual.
+  Contras: não reaproveita o HTML/JS — é escrever a interface do zero numa
+  segunda linguagem/framework (JS, mas com componentes nativos, não DOM).
+  Duas interfaces para manter em paralelo (web e RN) divergem com o tempo.
+  Maior investimento de todas as opções pesquisadas para este caso, porque o
+  app já existe em HTML/JS e React Native não usa esse código.
+  Custo: o mais alto de empacotamento entre as opções pesquisadas, por ser
+  essencialmente um app novo.
+
+Flutter
+  Mesma objeção de fundo que React Native: interface nova, em Dart, que não
+  reaproveita nada do app/ atual. Mais distante ainda da stack do projeto
+  (Python + HTML/JS) do que Capacitor ou React Native.
+
+Tauri Mobile
+  Pesquisa de 2026 descreve o suporte mobile do Tauri 2.x como "funcional,
+  mas mais jovem" que o desktop, com experiência "menos polida" que
+  Capacitor para este caso de uso (empacotar um app web existente).
+  Tauri também traz uma dependência de toolchain Rust que o projeto não tem
+  hoje — o pyproject.toml já rejeitou Tauri no desktop pelo mesmo motivo
+  (trazer a cadeia do Rust). Não recomendado como primeira escolha.
+
+Nativo nativo (Kotlin/Swift, duas bases de código separadas)
+  Controle total e melhor acesso a cada plataforma, mas é escrever e manter
+  dois apps nativos distintos do zero, nenhum deles reaproveitando o HTML/JS
+  existente. Custo de engenharia mais alto do levantamento, sem ganho
+  proporcional para o que foi pedido (acompanhar agentes, aprovar ações,
+  ver o avatar) — é o que se faria se o celular precisasse de algo como
+  widget de tela de bloqueio nativo, acesso contínuo a sensores, etc., que
+  não é o caso aqui.
+
+Avaliação de PWA no iOS e Android em 2026, especificamente:
+  - Android/Chrome: instala pelo prompt do navegador, push funciona mesmo
+    sem instalar na tela inicial (basta permissão concedida), notificação
+    aparece na bandeja igual a um app nativo. Otimização de bateria do
+    Android pode bloquear notificação de app que o usuário não abre há
+    tempo — vale orientar a desativar otimização de bateria para o PWA.
+  - iOS/Safari: instalação só manual (sem prompt), push só funciona depois
+    de instalado na tela inicial, nunca em aba comum do Safari. Desde o
+    Safari 18.4 existe "Declarative Web Push", que simplifica o envio, mas
+    o push no iOS nunca é silencioso — toda notificação aparece visível,
+    não dá para sincronizar dados em segundo plano via push. Sem Background
+    Sync/Periodic Background Sync em nenhuma versão do Safari até a data
+    desta pesquisa.
+
+
+3. ACESSO REMOTO — COMPARAÇÃO E RISCO
+--------------------------------------------------------------------------
+O risco de fundo é sempre o mesmo, documentado no próprio código do LEA
+(lea/server/app.py, config.server.is_exposed): o daemon dá acesso a
+ferramentas que executam comandos na máquina. Qualquer caminho de acesso
+remoto tem que ser julgado por "o que acontece se o token vazar ou se
+alguém encontrar esse endereço", não só por "funciona".
+
+Tailscale (recomendado)
+  O que é: rede privada ponto a ponto (mesh VPN), construída sobre
+  WireGuard. Cada dispositivo autorizado (PC, celular) recebe um endereço
+  dentro dessa rede privada; o tráfego de dados é criptografado de ponta a
+  ponta entre os dois dispositivos, e o plano de controle da Tailscale só
+  intermedeia a troca de chaves/descoberta de NAT — não vê o conteúdo do
+  tráfego.
+  Risco: o daemon nunca tem porta pública nenhuma. Mesmo que o token da UI
+  vaze, quem não estiver dentro da sua tailnet não alcança 127.0.0.1:7420
+  de forma alguma — é uma defesa em profundidade que as outras opções não
+  têm. O único terceiro envolvido é a Tailscale Inc. como operadora do
+  plano de controle (coordenação e NAT traversal); se isso for inaceitável,
+  a alternativa é Headscale (implementação própria, de código aberto, do
+  plano de controle da Tailscale) ou WireGuard manual — ver abaixo.
+  Resolve também o requisito de HTTPS: `tailscale cert` ou `tailscale
+  serve` emitem certificado Let's Encrypt real para o nó
+  (https://<dispositivo>.<tailnet>.ts.net), sem expor nada fora da tailnet
+  e sem o daemon do LEA precisar terminar TLS ele mesmo. Service Worker e
+  Web Push exigem contexto seguro (HTTPS, ou localhost) — um IP de
+  Tailscale sem certificado não bastaria; com `tailscale serve` apontando
+  para http://127.0.0.1:7420, o problema se resolve sem tocar no código do
+  LEA.
+  Custo: plano Personal é gratuito, sem prazo de expiração, para uso não
+  comercial — até 6 usuários, dispositivos de usuário ilimitados. Não achei
+  limite de banda documentado para esse plano; não vou inventar um número.
+  Configuração: instalar o cliente Tailscale no PC e no celular, entrar com
+  a mesma conta nos dois, autorizar o dispositivo — é a opção de
+  configuração mais simples das quatro, porque não exige abrir porta no
+  roteador nem configurar NAT.
+
+WireGuard autogerenciado (sem Tailscale)
+  O que é: o mesmo protocolo que a Tailscale usa por baixo, mas você monta
+  o servidor WireGuard na sua própria máquina/roteador e troca as chaves
+  manualmente.
+  Risco: tecnicamente o mais "zero terceiro" das quatro opções — nenhuma
+  empresa intermedeia nada, nem a coordenação. Mas a superfície de erro
+  humano sobe: é você quem abre a porta UDP no roteador, quem lida com IP
+  dinâmico de casa (precisa de DDNS), quem gera e distribui as chaves. Um
+  roteador mal configurado nessa abordagem tende a abrir mais do que devia,
+  não menos.
+  Custo: zero em dinheiro; custo de configuração e manutenção contínua mais
+  alto que o Tailscale, porque ele automatiza exatamente a parte
+  (NAT traversal, descoberta, rotação) que aqui fica manual.
+
+Cloudflare Tunnel (não recomendado como caminho principal)
+  O que é: conexão de saída do seu PC até a borda da Cloudflare, que então
+  expõe um hostname (seu ou um subdomínio deles) na internet pública.
+  Risco: mesmo com Cloudflare Access na frente (autenticação por e-mail/SSO
+  antes de chegar à sua aplicação), o hostname existe publicamente e pode
+  ser descoberto por enumeração de subdomínio. A superfície de ataque passa
+  a incluir qualquer brecha futura no Access, e o TLS é terminado na borda
+  da Cloudflare — ela está no meio da conversa de um jeito que o Tailscale
+  não está. Para uma aplicação web qualquer isso é aceitável; para um
+  daemon cujas ferramentas executam comandos na máquina, é expor o que o
+  projeto explicitamente tenta não expor.
+  Custo: o Tunnel em si é gratuito e sem limite de banda documentado.
+  Cloudflare Access é gratuito até 50 usuários — não é limitação prática
+  para uso pessoal, mas é mais um serviço de terceiro cuja configuração
+  precisa estar sempre certa.
+  Quando usaria: se um dia quiser publicar algo do LEA para outras pessoas
+  verem (não é o caso descrito aqui, que é só "o próprio usuário, do
+  próprio celular").
+
+ngrok (não recomendado)
+  O que é: proxy reverso que cria uma URL pública apontando para a porta
+  local.
+  Risco: no plano gratuito, segundo o levantamento de 2026, as sessões têm
+  limite de 2 horas, a URL é forçada a ser aleatória a menos que se pague,
+  e não há allowlist de IP nem OAuth no gratuito — qualquer um com a URL
+  alcança o túnel; a proteção real fica restrita aos planos pagos. É a
+  opção com pior relação risco/esforço das quatro para este caso.
+  Custo: gratuito com as restrições acima; "URLs e OAuth" aparecem como
+  parte dos planos pagos — não achei o valor atual em reais ou dólares, e
+  não vou inventar um número.
+
+Só rede local (sem nenhuma das opções acima)
+  O que é: celular só alcança o daemon quando está na mesma Wi-Fi de casa.
+  Risco: o mais baixo de todos, porque não existe caminho de fora para
+  dentro — literalmente não dá para "controlar de fora de casa", que é
+  exatamente o que o usuário pediu. Serve como modo de fallback (o PWA
+  continua funcionando assim quando o Tailscale estiver desligado), não
+  como solução.
+  Custo: zero. Recomendo manter como caminho que sempre funciona, em
+  paralelo ao Tailscale, não como substituto dele.
+
+
+4. AUTENTICAÇÃO E PAREAMENTO — DESENHO PROPOSTO
+--------------------------------------------------------------------------
+Hoje o token da UI é um arquivo em ~/.lea/ui_token (0600), o mesmo token
+para qualquer cliente que fale com a API (ver lea/security/tokens.py e o
+require_ui_token em lea/server/app.py). Copiar esse arquivo para o celular
+funcionaria, mas erra em dois pontos: não há como revogar só o celular sem
+trocar o token de todo mundo, e não há como dar ao celular um escopo menor
+que o do desktop.
+
+Desenho proposto, seguindo o padrão de pareamento por código/QR que apareceu
+consistentemente na pesquisa (o mesmo modelo usado por apps que pareiam com
+um servidor doméstico próprio):
+
+  1. O PC (dashboard ou janela da LEA, já autenticado com o ui_token de
+     sempre) pede um código de pareamento de uso único e validade curta
+     (minutos, não dias). O código some depois de usado ou de expirar.
+  2. O PC mostra esse código como QR (e também como texto curto, para quem
+     quiser digitar). O QR carrega o endereço do daemon dentro da tailnet
+     mais o código — não o token real.
+  3. O celular escaneia e manda o código para um endpoint novo (equivalente
+     a um "POST /api/pair/claim"). O servidor confere o código, consome-o
+     (não dá para usar duas vezes) e emite um token novo, de dispositivo,
+     diferente do ui_token do desktop.
+  4. Esse token de dispositivo é guardado no celular. Ideal: escopo restrito
+     — ver status, ver feed, aprovar/recusar ações pendentes — sem os
+     poderes de abrir sessão nova ou mudar configuração de frota, que hoje
+     vêm de brinde com qualquer portador do ui_token. Isso exige o servidor
+     passar a distinguir tipos de token por permissão, o que não existe
+     ainda (hoje só há dois tokens, UI e hook, cada um tudo-ou-nada dentro
+     do seu domínio).
+  5. Uma tela de "dispositivos pareados" no desktop lista os tokens de
+     celular emitidos e permite revogar um sem afetar os outros — espelha a
+     separação que já existe entre token de UI e token de hook, só que
+     agora com múltiplas instâncias em vez de um arquivo único.
+  6. No celular, antes de mostrar qualquer ação (sobretudo aprovar/recusar
+     um comando do agente), um gate local de biometria do aparelho (Face
+     ID/Touch ID/impressão digital via WebAuthn, que navegadores móveis já
+     suportam) — isso não autentica contra o servidor, só impede que quem
+     pegar o celular desbloqueado aprove algo sem querer.
+
+Limite real de guardar o token num PWA puro: sem wrapper nativo, o
+armazenamento disponível é localStorage/IndexedDB do navegador, não o
+Keychain/Keystore protegido por hardware. É armazenamento mais fraco do que
+um app nativo teria — risco aceitável para começar, mas é o argumento mais
+forte para considerar Capacitor depois, se o escopo do token de celular for
+amplo o suficiente para preocupar.
+
+
+5. NOTIFICAÇÃO — O QUE DÁ E O QUE EXIGE TERCEIRO
+--------------------------------------------------------------------------
+O que dá para fazer sem conta em serviço de terceiro (sem Firebase, sem
+OneSignal, sem Pusher): Web Push com chaves VAPID geradas e guardadas pelo
+próprio daemon. O fluxo é: o celular, com o PWA instalado, se inscreve no
+Push API do navegador; o navegador devolve um "endpoint" de inscrição; o
+daemon guarda esse endpoint (viraria uma tabela nova no SQLite, uma por
+dispositivo); quando uma aprovação fica pendente (ou outro evento que vale
+acordar o usuário), o daemon assina a mensagem com sua chave VAPID privada e
+manda direto para aquele endpoint. Não há conta, API key paga nem SDK de
+terceiro nesse caminho — é só o LEA falando o protocolo Web Push (RFC
+8030/8291/8292) que já faz parte do navegador.
+
+O que não dá para evitar, porque é a própria arquitetura da web: mesmo essa
+mensagem assinada pelo LEA precisa atravessar o serviço de push de quem fez
+o navegador do celular para chegar até ele — o relay da Google para
+Chrome/Android, o da Apple para Safari/iOS, o da Mozilla para Firefox. Isso
+não é uma decisão de arquitetura do LEA, é como o padrão Web Push funciona
+em qualquer navegador — não existe "push direto" sem esse relay, nem em app
+nativo (um app Android nativo também depende do FCM/Google Play Services
+por baixo na prática; um app iOS nativo depende do APNs da Apple sempre).
+A diferença real entre Web Push e "ir nativo com FCM/APNs" não é presença ou
+ausência de terceiro — é que Web Push não exige abrir conta, configurar
+projeto no Firebase Console nem gerenciar certificado de push da Apple; o
+relay já vem embutido no navegador, sem relação comercial nenhuma entre o
+LEA e a Google/Apple/Mozilla.
+
+Consequências práticas por plataforma:
+  - iOS: só recebe push depois do PWA instalado na tela inicial; nunca em
+    aba comum do Safari. O push nunca é silencioso — toda notificação
+    aparece visível ao usuário, não dá para "atualizar dados por trás" sem
+    mostrar nada.
+  - Android/Chrome: mais flexível — recebe mesmo sem instalar na tela
+    inicial, desde que a permissão de notificação tenha sido concedida.
+    Otimização de bateria do Android pode atrasar ou segurar notificações
+    de apps pouco usados; vale orientar o usuário a isentar o PWA da
+    otimização de bateria.
+  - Se, mais adiante, o caminho virar Capacitor com push nativo (plugin de
+    FCM/APNs em vez de Web Push do navegador): mesma dependência de fundo
+    (ainda é Google e Apple entregando a notificação), só que com uma conta
+    de desenvolvedor e uma chave de servidor a mais para gerenciar — não é
+    um caminho "mais sem terceiro", é um caminho com mais peças.
+
+
+6. AVATAR NO CELULAR — RECOMENDAÇÃO
+--------------------------------------------------------------------------
+Three.js sobre WebGL roda em navegador móvel moderno — Android Chrome e iOS
+Safari dão suporte a WebGL há anos. O risco levantado na pesquisa não é
+"não funciona", é desempenho sustentado: GPUs de celular sofrem thermal
+throttling sob carga contínua (o que roda a 60fps no primeiro segundo pode
+cair para 20fps depois de 30 segundos sem otimização) e shaders complexos
+drenam bateria mais rápido que conteúdo estático. O orçamento recomendado
+para mobile na pesquisa de 2026 é algo como menos de 50 a 100 draw calls por
+quadro — o avatar da LEA (um mesh só, com um shader de pulsos e deformação
+de boca) está bem dentro dessa faixa pelo que está documentado em
+docs/avatar.md, então o risco aqui é mais de bateria em sessão longa do que
+de não rodar.
+
+Recomendação: manter o avatar no celular, não cortar — é parte da
+identidade do produto e o pedido original ("ver a LEA") pede isso
+explicitamente. Ajustar, não eliminar:
+  - travar o frame rate em algo como 30fps no perfil mobile, em vez de
+    deixar correr livre;
+  - reduzir a intensidade/complexidade do shader de pulsos nesse perfil;
+  - a textura já é uma imagem única (lea-retrato.png) sobre malha
+    subdividida — conferir se o tamanho dela está adequado para tela de
+    celular, sem reescalar inutilmente;
+  - já existe fallback para quando WebGL não está disponível e respeito a
+    "movimento reduzido" do sistema (docs/avatar.md) — isso vale igual no
+    celular, não precisa de nada novo.
+  - testar SpeechSynthesis (usada por avatar.speak()) em Safari iOS e Chrome
+    Android separadamente: suporte de voz varia mais entre navegadores
+    móveis do que no desktop.
+  - o navegador suspende o contexto WebGL quando o PWA vai para segundo
+    plano — é esperado, não é bug a corrigir; o avatar reaparece ao voltar
+    ao app.
+
+
+7. O QUE REAPROVEITA E O QUE É NOVO
+--------------------------------------------------------------------------
+Reaproveita sem mudança:
+  - O daemon inteiro como está: API REST, X-Lea-Token, WebSocket /ws.
+  - app/avatar.html, assets/lea-avatar.js, assets/lea-presence.js e
+    lea-waveform — a mesma página roda no navegador do celular.
+  - GET /api/agent/approvals e POST /api/agent/approvals/{id}/decision —
+    exatamente o que a tela de aprovação do celular precisa chamar.
+  - O truque de servir app/ pela mesma origem do daemon (evita CORS) —
+    continua funcionando igual, só que a "origem" passa a ser o endereço
+    Tailscale em vez de 127.0.0.1.
+  - O padrão de dois tokens com propósitos separados (UI / hook) — o
+    desenho de pareamento do item 4 é uma extensão dessa mesma ideia, não
+    uma ideia nova.
+
+Precisa ser escrito do zero:
+  - manifest.json + service worker + ícones, para o PWA ser instalável e
+    funcionar offline no shell da página.
+  - Endpoint(s) de pareamento (gerar código, consumir código, emitir token
+    de dispositivo, listar/revogar dispositivos pareados) — hoje não existe
+    conceito de "múltiplos tokens de UI com escopos diferentes", só um
+    ui_token único.
+  - Tabela nova no banco para inscrições de Web Push por dispositivo, e a
+    lógica de assinar/enviar com VAPID a partir de eventos como "aprovação
+    pendente".
+  - Uma tela pensada para celular (fila de aprovações + feed ao vivo +
+    avatar), separada do dashboard denso que existe hoje — o dashboard
+    atual foi desenhado para tela de desktop; reaproveita componentes/CSS,
+    mas o layout em si é novo.
+  - `tailscale serve` (ou `tailscale cert`) configurado apontando para o
+    daemon — é configuração de infraestrutura, não código do LEA, mas é
+    trabalho novo de qualquer forma.
+  - Se mais adiante for Capacitor: o wrapper em si, as contas de loja, os
+    plugins nativos de push e de armazenamento seguro — tudo novo.
+
+
+8. PASSOS DE IMPLEMENTAÇÃO, EM ORDEM
+--------------------------------------------------------------------------
+1. Instalar Tailscale no PC onde o daemon roda e no celular; autorizar os
+   dois na mesma conta/tailnet. Pré-requisito de tudo que vem depois —
+   sem endereço alcançável, não há cliente remoto.
+2. Confirmar que o celular alcança http://<nome-do-pc>:7420/api/health pela
+   rede do Tailscale, com e sem Wi-Fi de casa (testar em dados móveis).
+   Validação do passo 1 antes de construir qualquer coisa em cima.
+3. Rodar `tailscale cert`/`tailscale serve` para o nó do daemon, confirmando
+   que https://<nome>.<tailnet>.ts.net chega até a porta 7420. Pré-requisito
+   para service worker e Web Push, que exigem contexto seguro — sem isso,
+   os passos 5 e 7 não funcionam, mesmo que o resto esteja pronto.
+4. Construir o fluxo de pareamento (gerar código no desktop, QR, endpoint de
+   claim, token de dispositivo, tela de dispositivos pareados/revogação).
+   Pré-requisito para o celular ter uma identidade própria em vez de copiar
+   o ui_token do desktop.
+5. Construir o manifest.json e o service worker, com a tela mobile de
+   aprovações/feed/avatar usando o token de dispositivo do passo 4 para
+   autenticar. Depende do passo 3 (HTTPS) para instalar de verdade no iOS,
+   e do passo 4 para autenticar sem reusar o token do desktop.
+6. Validar o avatar no celular de fato (iOS e Android, Wi-Fi e dados
+   móveis) e aplicar o perfil mobile (fps, shader) do item 6 se a bateria
+   sofrer. Pode rodar em paralelo ao passo 5, mas só faz sentido avaliar
+   depois que a página carrega de verdade no celular.
+7. Implementar inscrição de Web Push + geração de chaves VAPID + disparo no
+   evento de aprovação pendente. Depende do passo 5 (PWA instalado), porque
+   no iOS push simplesmente não existe fora de um PWA instalado na tela
+   inicial.
+8. (Opcional, mais adiante) Avaliar Capacitor só se push nativo ou presença
+   em loja de aplicativos vier a ser exigência real. Depende dos passos 4 a
+   7 estarem estáveis, porque o wrapper nativo reaproveitaria a mesma página
+   web, não substituiria o trabalho anterior.
+
+
+9. DECISÕES QUE SÃO DO USUÁRIO, NÃO MINHAS
+--------------------------------------------------------------------------
+  - Aceitar a Tailscale Inc. como único terceiro no caminho (plano de
+    controle, não o tráfego de dados) ou insistir em zero terceiro com
+    Headscale autogerenciado ou WireGuard manual, pagando isso em mais
+    configuração e manutenção contínua.
+  - Quanto poder o token do celular deve ter: espelhar o ui_token do
+    desktop (controle total, mais simples de construir) ou um escopo
+    deliberadamente menor (só ver + aprovar/recusar, sem abrir sessão nova
+    nem mudar configuração de frota) — isso é decisão de produto sobre
+    quanto confiar no aparelho que sai de casa, não uma questão técnica.
+  - Aceitar as duas limitações permanentes do iOS — instalação manual (sem
+    prompt do Safari) e notificação sempre visível, nunca silenciosa — ou
+    decidir que, por causa delas, vale ir direto para Capacitor com push
+    nativo mais cedo, mesmo pagando o preço de toolchain e conta de
+    desenvolvedor Apple.
+  - Se e quando investir em Capacitor (ou outro wrapper nativo) para ter
+    armazenamento seguro de hardware e presença em loja de app, aceitando a
+    dependência de Node/Gradle/Xcode que o projeto hoje não tem — ou manter
+    PWA como teto definitivo, pela mesma filosofia de dependência mínima que
+    já decidiu pywebview no desktop.
+  - Manter ou cortar o avatar no celular — tecnicamente ambos são viáveis;
+    é decisão de marca/experiência, não limitação técnica encontrada na
+    pesquisa.
+
+
+10. FONTES
+--------------------------------------------------------------------------
+PWA no iOS/Android, push e limitações em 2026:
+  https://www.mobiloud.com/blog/progressive-web-apps-ios/
+  https://tappwa.com/blog/ios-pwa-limitations-2026
+  https://instantpwa.com/answers/can-pwa-send-push-notifications-ios
+  https://blog.codercops.com/blog/progressive-web-apps-2026
+  https://flywheel.so/post/can-pwas-send-push-notifications
+  https://www.roibest.com/resources/blog/pwa-push-notifications-android/
+  https://docs.bswen.com/blog/2026-03-12-safari-pwa-limitations-ios/
+
+Acesso remoto — Tailscale, WireGuard, Cloudflare Tunnel, ngrok:
+  https://homelabaddiction.com/tailscale-vs-wireguard-vs-cloudflare-tunnel-for-homelabs-which-remote-access-model-actually-fits-your-setup/
+  https://wikiwalls.com/self-hosted/tailscale-vs-cloudflare-tunnel-vs-wireguard/
+  https://devopsboys.com/blog/cloudflare-tunnel-vs-ngrok-vs-tailscale-2026
+  https://needtoknowit.com.au/blog/tailscale-vs-cloudflare-tunnels-for-remote-access/
+  https://costbench.com/software/business-vpn/tailscale/free-plan/
+  https://www.lilachbullock.com/is-tailscale-free/
+  https://recca0120.github.io/en/2026/04/14/cloudflare-tunnel-2026/
+  https://tech-insider.org/cloudflare-tunnel-setup-2026-homelab/
+  https://shattered.io/cloudflare-access-service-tokens-jwt-validation-12-steps-2026/
+  https://celistra.dev/blog/is-ngrok-safe-home-server/
+  https://instatunnel.my/blog/ngrok-security-analysis-why-instatunnel-emerges-as-the-superior-alternative
+  https://makerstack.co/reviews/ngrok-review/
+
+HTTPS/contexto seguro em nó de Tailscale:
+  https://wilw.dev/blog/2022/10/27/tailscale-virtualhosts/
+  https://blog.openreplay.com/secure-local-web-apps-tailscale/
+  https://github.com/jonocodes/deckd/issues/181
+
+Pareamento por QR / token de dispositivo escopado:
+  https://github.com/ScoreSymphony/AI-Multi-Agent-Platform/issues/1320
+  https://github.com/suoak/AionCore/pull/209
+  https://github.com/all-completed/remote-browser-mobile/issues/12
+  https://github.com/RichardZhengQuan/NEO/pull/4
+
+Web Push / VAPID sem SaaS de push:
+  https://dev.to/bunty9/-self-hosted-push-notifications-12g5
+  https://blog.codercops.com/blog/web-push-notifications-implementation-guide-2026
+  https://github.com/Wikid82/go_notify_yourself/issues/14
+  https://granit-fx.dev/blog/web-push-notifications-dotnet-10-vapid/
+
+Three.js/WebGL em celular:
+  https://coderlegion.com/4191/performance-of-three-mobile-devices-and-lower-end-hardware-for-games-and-creative-resumes
+  https://www.utsubo.com/blog/threejs-best-practices-100-tips
+  https://dark-moon.org/blog/webgl-performance-low-end-devices/
+
+Capacitor vs React Native vs Flutter vs Tauri Mobile:
+  https://wanilla.co/blog/capacitor-vs-react-native/
+  https://kanopylabs.com/blog/capacitor-vs-react-native-vs-flutter
+  https://vp0.com/blogs/react-native-vs-capacitor-2026-performance
+  https://www.abratabia.com/native-wrappers/
+
+Contexto interno consultado (não é fonte externa, mas embasou a análise):
+  README.md, docs/arquitetura.md, docs/avatar.md, lea/server/app.py,
+  lea/desktop.py, pyproject.toml — todos em
+  /home/leandro-dukievicz/Projetos/LEA

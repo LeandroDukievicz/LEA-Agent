@@ -29,11 +29,24 @@ TITLE = "LEA"
 SIZE = (520, 760)
 MIN_SIZE = (360, 520)
 
-INSTALL_HINT = (
-    "A janela da LEA precisa do extra `desktop`:\n"
-    "    uv sync --extra desktop\n"
-    "No Linux ela usa o WebKitGTK do sistema pelo PyGObject, que vem da "
-    "distribuição e não do pip (no Ubuntu: gir1.2-webkit2-4.1)."
+NO_PYWEBVIEW = (
+    "A janela da LEA precisa do extra 'desktop':\n"
+    "    uv sync --extra dev --extra desktop"
+)
+
+#: No Linux o pywebview não traz o backend gráfico: ele usa o PyGObject da
+#: distribuição, que não existe no PyPI. Um venv comum não enxerga pacote de
+#: sistema, então instalar o extra não basta -- e o erro que o pywebview levanta
+#: nesse caso não diz nada disso.
+NO_GUI_BACKEND = (
+    "O pywebview está instalado, mas não achou backend gráfico.\n"
+    "No Linux ele usa o WebKitGTK pelo PyGObject, que vem da distribuição e não "
+    "do pip:\n"
+    "    sudo apt install gir1.2-webkit2-4.1 python3-gi\n"
+    "Um venv comum não enxerga pacote de sistema. Aponte o PyGObject para ele:\n"
+    "    PYTHONPATH=/usr/lib/python3/dist-packages lea avatar\n"
+    "ou recrie o ambiente com 'uv venv --system-site-packages'.\n"
+    "Saída imediata, sem nada disso: 'lea avatar --browser'."
 )
 
 
@@ -63,7 +76,7 @@ def run(*, fullscreen: bool = False, on_top: bool = False) -> None:
     try:
         import webview
     except ModuleNotFoundError as exc:  # pragma: no cover - depende do extra
-        raise RuntimeError(INSTALL_HINT) from exc
+        raise RuntimeError(NO_PYWEBVIEW) from exc
 
     window = webview.create_window(
         TITLE,
@@ -79,5 +92,13 @@ def run(*, fullscreen: bool = False, on_top: bool = False) -> None:
     # `private_mode` vem ligado por padrão e desliga o localStorage. A página
     # guarda ali o token do daemon, então com ele ligado o websocket nunca
     # conecta: a LEA abre, renderiza e fica muda, sem erro nenhum à vista.
-    webview.start(private_mode=False)
+    try:
+        webview.start(private_mode=False)
+    except Exception as exc:  # pragma: no cover - depende do ambiente gráfico
+        # O pywebview levanta WebViewException genérica quando não acha GTK nem
+        # QT. Traduzir importa: o traceback cru não diz que falta um pacote da
+        # distribuição nem que o venv não o enxerga.
+        if "QT or GTK" in str(exc):
+            raise RuntimeError(NO_GUI_BACKEND) from exc
+        raise
     return window
