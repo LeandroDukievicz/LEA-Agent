@@ -18,7 +18,7 @@ from typing import Any
 
 import aiosqlite
 
-from lea import costs as cost_tracker, events, skills
+from lea import aimemory, costs as cost_tracker, events, skills
 from lea.config import Config
 from lea.llm import split_model
 from lea.memory import Memory
@@ -374,7 +374,14 @@ class AgentService:
                         model=model,
                         max_tokens=min(4096, max_tokens - tokens_in - tokens_out),
                         system=system,
-                        tools=AGENT_TOOLS + ([SKILL_UPDATE_TOOL] if skill is not None else []),
+                        tools=(
+                            AGENT_TOOLS
+                            + ([SKILL_UPDATE_TOOL] if skill is not None else [])
+                            # Nos backends de CLI o ai-memory chega por MCP. Aqui
+                            # quem roda o laço é o LEA, e sem isto este era o
+                            # único modo em que ela trabalhava sem memória.
+                            + (aimemory.TOOLS if aimemory.configured() else [])
+                        ),
                         messages=messages,
                     )
                     usage = getattr(response, "usage", None)
@@ -475,6 +482,7 @@ class AgentService:
                                             session_id=session_id,
                                             skill=skill,
                                             approval_granted=True,
+                                            project_slug=project_slug,
                                         )
                                         is_error = result.startswith("Blocked:")
                                 else:
@@ -485,6 +493,7 @@ class AgentService:
                                         approval_patterns=approval_patterns,
                                         session_id=session_id,
                                         skill=skill,
+                                        project_slug=project_slug,
                                     )
                                     is_error = result.startswith("Blocked:")
                                     if is_error:
@@ -718,7 +727,11 @@ class AgentService:
         session_id: str,
         skill: skills.SkillDocument | None,
         approval_granted: bool = False,
+        project_slug: str = "",
     ) -> str:
+        if name in aimemory.TOOL_NAMES:
+            return await aimemory.dispatch(name, arguments, project=project_slug)
+
         if name == "list_files":
             directory = _resolve_project_path(root, str(arguments.get("directory") or ""))
             if not directory.is_dir():
