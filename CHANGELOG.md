@@ -25,6 +25,20 @@ Enquanto o LEA não tem release, cada entrada é uma fase da especificação.
   **depois** das regras de escopo, para tom não poder reescrever permissão.
 - Memória de registro passa a ser o **ai-memory**, por MCP.
 
+### Fase 5 concluída, Fase 7 avançando
+
+- **Aprovação humana nos backends de CLI**, pelo hook `PreToolUse` que Codex e
+  Claude Code expõem e o LEA não instalava. Funciona **mesmo com as travas
+  soltas**: verificado contra o CLI real que `permissionDecision: "deny"` barra
+  a ferramenta com `--dangerously-skip-permissions` ativo.
+- **Coleira do publicador** (`lea fleet guard`): um `pre-push` para o agy, que
+  não expõe hook nenhum. Quem executa é o git, antes de qualquer byte sair.
+- **Memória no backend `anthropic-api`**, que era o único sem nenhuma — os de
+  CLI alcançam o ai-memory por MCP, este não fala MCP. Ferramentas `recall` e
+  `remember` por JSON-RPC direto, sem dependência nova.
+- **O wheel passa a levar a interface** (`lea/app`). Antes, `pip install` dava
+  um daemon servindo `/app` de um diretório inexistente.
+
 ### Corrigido
 
 - Sessões ficavam `active` para sempre quando o daemon morria; o PTY ia junto e

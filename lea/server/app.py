@@ -422,6 +422,22 @@ class _NoStoreStatic(StaticFiles):
         return response
 
 
-_PROTOTYPE = Path(__file__).resolve().parents[2] / "app"
-if _PROTOTYPE.is_dir():
+def _prototype_dir() -> Path | None:
+    """Onde está o protótipo, instalado ou em checkout de desenvolvimento.
+
+    Instalado, ele vem dentro do pacote (`lea/app`, via force-include). Em
+    checkout, fica na raiz do repositório. Procurar nos dois evita o que
+    acontecia antes: o wheel não levava `app/` e o caminho relativo à raiz
+    apontava para dentro do site-packages, então o daemon instalado servia
+    /app de um diretório inexistente.
+    """
+    aqui = Path(__file__).resolve()
+    for candidato in (aqui.parents[1] / "app", aqui.parents[2] / "app"):
+        if (candidato / "index.html").is_file():
+            return candidato
+    return None
+
+
+_PROTOTYPE = _prototype_dir()
+if _PROTOTYPE is not None:
     app.mount("/app", _NoStoreStatic(directory=_PROTOTYPE, html=True), name="prototype")

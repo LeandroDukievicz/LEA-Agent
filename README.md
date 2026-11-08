@@ -23,7 +23,7 @@ supervisão. Ver [docs/estudo-hermes.md](docs/estudo-hermes.md).
 
 ![Centro de Comando LEA](docs/screenshots/01-overview.png)
 
-## Estado: Fases 1 a 4 concluídas; Fase 5 em andamento
+## Estado: Fases 1 a 6 concluídas; Fase 7 em andamento
 
 O núcleo é um **daemon headless** com API local, WebSocket de eventos e receptor
 de hooks. A interface é um cliente dele — é o que permite rodar sem janela num
@@ -35,9 +35,9 @@ homelab e trocar a camada visual sem mexer no produto.
 | ✅ Fase 2 | memória: wiki git, busca FTS, decaimento, grafo, injeção de contexto, servidor MCP |
 | ✅ Fase 3 | projetos, launcher, adaptadores de harness (Claude Code, Codex, agy), hooks, PTY, worktrees, frota |
 | ✅ Fase 4 | handoffs: geração no Stop, claim, injeção no contexto |
-| 🟡 Fase 5 | lea-agent, skills e cron — aprovações nativas dos CLIs pendentes |
+| ✅ Fase 5 | lea-agent, skills, cron e **aprovação humana nos backends de CLI** (hook `PreToolUse`) |
 | ✅ Fase 6 | bots Telegram e Discord com allowlist e rotas por projeto |
-| 🟡 Fase 7 | custo estimado da Anthropic API; empacotamento pendente |
+| 🟡 Fase 7 | custo estimado da Anthropic API; wheel já leva a interface, instalador do SO pendente |
 
 A camada de interface ainda não foi escolhida — ver [Interface & Telas do Projeto](#interface--telas-do-projeto).
 
@@ -49,7 +49,7 @@ Requer Python 3.12+ e [uv](https://docs.astral.sh/uv/).
 uv sync --extra dev
 uv run lea doctor      # confere instalação, permissões e banco
 uv run lea daemon      # sobe o núcleo em 127.0.0.1:7420
-uv run pytest          # 228 testes (unidade + aceite)
+uv run pytest          # 254 testes (unidade + aceite)
 ```
 
 Testes de aceite exercitam o LEA pela borda — HTTP, WebSocket, MCP por stdio,
@@ -87,8 +87,9 @@ AG Antigravity CLI  1.4.12                 ○      ●    não expõe hooks de 
 ```
 
 `lea harnesses --install claude-code` registra os hooks de ciclo de vida
-(`SessionStart`, `PostToolUse`, `PreCompact`, `Stop`) e o servidor MCP de
-memória.
+(`PreToolUse`, `SessionStart`, `PostToolUse`, `PreCompact`, `Stop`) e o servidor
+MCP de memória. O `PreToolUse` é o que dá ao LEA a aprovação humana: é o único
+que roda antes da ação.
 
 **Isso altera a configuração de outra ferramenta na sua máquina**, então é um
 comando explícito e nunca roda sozinho. Antes de tocar em qualquer arquivo o
@@ -198,6 +199,44 @@ do usuário, não chave de provedor de modelo — `OPENAI_API_KEY`, `CODEX_API_K
 > entre máquinas. Rodar as duas memórias em paralelo gera duas memórias parciais e
 > nenhuma completa; aposentar a wiki esvazia duas fases concluídas. A decisão
 > ainda não foi tomada.
+
+## Aprovação humana
+
+Comandos que casam com `agent.require_approval_for` são **recusados antes de
+acontecer**, em qualquer backend. Nos de CLI isso vem do hook `PreToolUse`, que
+Codex e Claude Code expõem e que roda antes da ferramenta.
+
+```
+agente tenta `git push`
+  → recusado, aprovação entra na fila, alerta no barramento
+  → você decide: lea approvals approve <id>
+  → o agente tenta de novo e passa
+```
+
+Recusar e deixar repetir, em vez de pendurar o hook esperando a decisão: um
+hook parado trava o CLI por tempo indeterminado, e o tempo-limite não é nosso
+para definir.
+
+**Isso vale mesmo com as travas soltas.** Verificado contra o CLI real: um
+`permissionDecision: "deny"` barra a ferramenta **mesmo com
+`--dangerously-skip-permissions`** — a flag desliga o prompt interativo, não os
+hooks. Uma versão anterior deste README dizia que uma frota solta transformava o
+LEA em gravador de voo; estava errado.
+
+O `agy` é a exceção: ele não expõe hook nenhum. Para ele a trava vive no git.
+
+```bash
+lea fleet guard                # instala um pre-push no repositório
+lea fleet guard --remove
+```
+
+Quem executa o `pre-push` é o próprio git, antes de qualquer byte sair, e
+nenhuma flag de CLI o desliga. Ele reconhece a frota pela variável que o
+Launcher exporta; push que **você** der no terminal passa direto. O comando faz
+backup de qualquer `pre-push` que já esteja lá e nunca apaga hook alheio.
+
+Se o daemon estiver fora do ar, o hook deixa a ação passar. É falha-aberta de
+propósito: fechar faria um restart do daemon travar todo agente da máquina.
 
 ## Frota
 
