@@ -21,7 +21,7 @@ import pytest
 from lea.harnesses import hooks_file
 from lea.harnesses.base import LEA_HOOK_EVENTS, Health
 from lea.harnesses.claude_code import ClaudeCode
-from lea.harnesses.codex import Codex
+from lea.harnesses.codex import TRUST_EVENT_NAMES, Codex
 
 HOOK_CMD = "/opt/lea/bin/lea hook"
 
@@ -285,7 +285,9 @@ def test_codex_hook_confiado_e_ok(codex_home: Path) -> None:
     # Simula a confiança que o Codex grava depois que o usuário aceita.
     hooks_path = adaptador.hooks_file_path
     linhas = ["[hooks.state]"]
-    for snake in ("session_start", "post_tool_use", "pre_compact", "stop"):
+    # Derivado de LEA_HOOK_EVENTS: cravar a lista aqui fazia o teste quebrar
+    # toda vez que um evento novo entrava, sem nada estar errado.
+    for snake in (TRUST_EVENT_NAMES[event] for event in LEA_HOOK_EVENTS):
         linhas.append(f'[hooks.state."{hooks_path}:{snake}:0:0"]')
         linhas.append('trusted_hash = "sha256:abc"')
     (codex_home / "config.toml").write_text("\n".join(linhas) + "\n", encoding="utf-8")
@@ -304,3 +306,15 @@ def test_fixture_do_codex_reflete_o_formato_real(codex_home: Path) -> None:
     """Guarda-costas: se o formato mudar, o teste conta o porquê."""
     config = tomllib.loads((codex_home / "config.toml").read_text())
     assert "projects" in config, "config.toml do Codex usa [projects.\"<path>\"]"
+
+
+def test_todo_evento_tem_nome_de_confianca_no_codex() -> None:
+    """O Codex guarda a confiança por `<hooks.json>:<evento_snake>:i:j`.
+
+    Sem entrada no mapa o código caía em `event.lower()`, que produz
+    "pretooluse" onde o Codex escreve "pre_tool_use" -- a chave nunca casaria e
+    o hook ficaria eternamente "aguardando confiança", sem nada apontar o
+    porquê. Formato conferido contra uma instalação real em 2026-11-08.
+    """
+    faltando = [event for event in LEA_HOOK_EVENTS if event not in TRUST_EVENT_NAMES]
+    assert not faltando, f"sem nome de confiança: {faltando}"

@@ -36,7 +36,7 @@ from lea.db import session as db
 from lea.memory import Memory
 from lea import handoffs
 from lea import skills
-from lea import sessions
+from lea import gate, sessions
 from lea.agent import AgentService
 from lea.cron import CronScheduler
 from fastapi.staticfiles import StaticFiles
@@ -59,6 +59,9 @@ HOOK_TOKEN_HEADER = "X-Lea-Hook-Token"
 #: nome de hook novo virar erro de constraint em tempo de execução.
 _HOOK_EVENT_TYPES = {
     "SessionStart": "session_start",
+    # PreToolUse é o único que roda ANTES da ação, e por isso o único que pode
+    # recusá-la. É o que permite aprovação humana nos backends de CLI.
+    "PreToolUse": "tool_call",
     "PostToolUse": "tool_call",
     "PreCompact": "memory",
     "Stop": "session_end",
@@ -347,6 +350,30 @@ async def receive_hook(event_name: str, request: Request) -> dict[str, Any]:
     response: dict[str, Any] = {"ok": True, "event": event_name}
     if response_handoff is not None:
         response["handoff"] = response_handoff
+
+    if event_name == "PreToolUse":
+        # A ação ainda não aconteceu. Decidir aqui é a única chance de barrar.
+        config: Config = request.app.state.config
+        verdict = await gate.decide(
+            request.app.state.db,
+            session_id=session_id,
+            tool_name=str(payload.get("tool_name") or ""),
+            tool_input=payload.get("tool_input"),
+            patterns=config.agent.require_approval_for,
+            harness=str(payload.get("harness") or ""),
+        )
+        response["decision"] = verdict
+        if not verdict["allow"]:
+            request.app.state.bus.emit(
+                "alert",
+                {
+                    "event": "approval_requested",
+                    "approval_id": verdict.get("approval_id"),
+                    "command": verdict.get("command"),
+                    "reason": verdict.get("reason"),
+                },
+                session_id=session_id,
+            )
 
     if event_name == "SessionStart":
         # O agente que está subindo recebe o bloco de memória para injetar.

@@ -22,7 +22,10 @@ from typing import Any, Protocol, runtime_checkable
 
 #: Eventos de ciclo de vida que o LEA entende. Claude Code e Codex usam
 #: exatamente estes nomes, em PascalCase, nos arquivos de hook.
-LEA_HOOK_EVENTS: tuple[str, ...] = ("SessionStart", "PostToolUse", "PreCompact", "Stop")
+#: ``PreToolUse`` vem primeiro porque é o único que roda ANTES da ação e pode
+#: recusá-la -- é o que dá ao LEA aprovação humana nos backends de CLI. Sem
+#: ele, o LEA só via o que já tinha acontecido.
+LEA_HOOK_EVENTS: tuple[str, ...] = ("PreToolUse", "SessionStart", "PostToolUse", "PreCompact", "Stop")
 
 
 class Health(str, Enum):

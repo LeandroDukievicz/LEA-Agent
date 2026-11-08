@@ -456,7 +456,7 @@ def hook(
     """
     import httpx
 
-    if event not in {"SessionStart", "PostToolUse", "PreCompact", "Stop"}:
+    if event not in {"PreToolUse", "SessionStart", "PostToolUse", "PreCompact", "Stop"}:
         err_console.print(f"[red]evento desconhecido:[/] {event}")
         raise typer.Exit(2)
 
@@ -489,10 +489,28 @@ def hook(
         )
         response.raise_for_status()
     except Exception as exc:
+        # Invariante do projeto: o hook nunca derruba a sessão do agente.
+        # Daemon fora do ar = sai 0 e a ação segue. Isso é falha-aberta de
+        # propósito -- fechar aqui faria um restart do daemon travar todo
+        # agente da máquina. Quem quiser o contrário troca a invariante, não
+        # esta linha.
         logging.getLogger(__name__).debug("hook %s não entregue: %s", event, exc)
         raise typer.Exit(0) from None
 
-    console.print_json(data=response.json())
+    body = response.json()
+    decision = body.get("decision") if isinstance(body, dict) else None
+    if isinstance(decision, dict) and not decision.get("allow", True):
+        # O CLI lê stdout: este JSON é o que faz a ferramenta ser recusada.
+        # Nada mais pode ir para stdout neste caminho.
+        from lea import gate
+
+        print(json.dumps(gate.deny_payload(
+            decision.get("reason") or "ação protegida",
+            decision.get("approval_id"),
+        ), ensure_ascii=False))
+        raise typer.Exit(0)
+
+    console.print_json(data=body)
 
 
 @app.command()

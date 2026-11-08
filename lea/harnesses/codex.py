@@ -51,6 +51,7 @@ MCP_NAME = "lea-memory"
 
 #: PascalCase (hooks.json) -> snake_case (chave de confiança no config.toml).
 TRUST_EVENT_NAMES = {
+    "PreToolUse": "pre_tool_use",
     "SessionStart": "session_start",
     "PostToolUse": "post_tool_use",
     "PreCompact": "pre_compact",
