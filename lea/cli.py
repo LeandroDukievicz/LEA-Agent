@@ -909,6 +909,43 @@ def fleet_up(
     console.print("Acompanhe em [cyan]lea fleet status[/] ou no dashboard.")
 
 
+@fleet_commands.command("guard")
+def fleet_guard(
+    path: str = typer.Option(".", "--path", "-p", help="Repositório onde instalar."),
+    remove: bool = typer.Option(False, "--remove", help="Remove a coleira."),
+) -> None:
+    """Instala a coleira do publicador: um pre-push que barra push da frota.
+
+    O portão do LEA cobre Codex e Claude Code, que expõem PreToolUse. O agy
+    não expõe hook nenhum -- e é justamente ele o publicador. Para ele a trava
+    precisa viver no git, que executa antes de qualquer byte sair e não é
+    desligado por flag de CLI.
+
+    Isto escreve em `.git/hooks` do repositório, então nunca roda sozinho.
+    """
+    from pathlib import Path as _Path
+
+    from lea import guard
+
+    repo = _Path(path).expanduser().resolve()
+    if not (repo / ".git").exists():
+        err_console.print(f"[red]{repo} não é um repositório git.[/]")
+        raise typer.Exit(1)
+
+    report = guard.remove(repo) if remove else guard.install(repo)
+    if not report.ok:
+        err_console.print(f"[red]{report.problem}[/]")
+        raise typer.Exit(1)
+    console.print(f"coleira [cyan]{report.action}[/] em {report.path}")
+    if report.backup:
+        console.print(f"hook anterior guardado em {report.backup}")
+    if not remove:
+        console.print(
+            "Push dado por você, no terminal, continua passando: a coleira só "
+            "pega sessão aberta pelo LEA."
+        )
+
+
 @fleet_commands.command("status")
 def fleet_status() -> None:
     """Mostra as sessões da frota que estão ativas."""
