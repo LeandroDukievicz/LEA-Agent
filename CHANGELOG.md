@@ -42,6 +42,34 @@ Enquanto o LEA não tem release, cada entrada é uma fase da especificação.
   então barrava um `echo` que citasse o padrão, um `grep` procurando por ele na
   documentação ou um CLI recebendo a expressão como prompt. Agora compara token
   a token, no começo de cada comando da linha.
+
+### Falhas encontradas varrendo o projeto
+
+- **O contexto de memória nunca chegava ao agente nos backends de CLI.** O
+  `lea hook` imprimia o corpo inteiro da resposta do daemon — `{"ok": true,
+  "event": ..., "context": ...}` —, forma que nenhum dos dois CLIs lê. O bloco
+  era calculado, devolvido, impresso e descartado: a injeção de contexto da Fase
+  2 estava inerte, sem nada no código dizendo isso, porque o dado chegava certo
+  até a última linha. Agora sai em `hookSpecificOutput.additionalContext`,
+  formato conferido contra o hook do ai-memory rodando nesta máquina.
+- **stdout de hook virou canal de protocolo.** Só a recusa do portão e o
+  `additionalContext` saem por ali; o resto é silêncio, e o que serve para
+  depurar vai para o log. Antes, todo hook escrevia JSON desconhecido em stdout
+  a cada ferramenta usada.
+- **O dashboard não tinha como chegar ligado ao daemon.** Servido em `/app/`,
+  aberto à mão ele vem sem token: não acha configuração, não abre o websocket e
+  o chat responde localmente. Como o protótipo renderiza inteiro, parecia
+  funcionar. `lea dashboard` monta a URL com o token, como `lea avatar` sempre
+  fez, e o daemon passa a imprimir os dois comandos ao subir.
+- **O indicador de ligação da janela mentia por um segundo** em toda abertura:
+  ele só atualizava no primeiro `setInterval`, então anunciava "sozinha"
+  justamente enquanto conectava. Existe para não confundir desconectada com
+  ociosa, e o atraso fazia dele a fonte da confusão.
+- **404 em `/favicon.ico`** a cada carregamento das duas páginas. Resolvido com
+  um `rel="icon"` em data URI: sem requisição a mais e sem binário no repo.
+
+### Autonomia da frota
+
 - **A frota é autônoma.** `lea fleet up` sobe os três papéis em modo
   `autonomous`, e o portão respeita isso: dado o prompt de papel, cada um
   resolve o que for necessário sem parar para pedir. O padrão que casou vai para

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR"><head>
 <meta charset="utf-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23000'/%3E%3Ccircle cx='16' cy='16' r='10' fill='none' stroke='%2300e5ff' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='3.5' fill='%2300e5ff'/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LEA</title>
 <!--
@@ -56,7 +57,7 @@
 <body>
   <header>
     <span>┌─ AGENT LEA ─┐</span>
-    <span id="vinculo" title="Ligação com o daemon">○ sozinha</span>
+    <span id="vinculo" title="Ligação com o daemon">◐ ligando</span>
   </header>
 
   <main>
@@ -84,13 +85,29 @@
     2: ['◐ caindo', '#f5ff3b'],
     3: ['○ sozinha', '#677b8e'],
   };
-  setInterval(() => {
+  const mostrar = () => {
     const socket = window.LeaPresence && window.LeaPresence.socket;
     const [texto, cor] = estados[socket ? socket.readyState : 3];
     marca.textContent = texto;
     marca.style.color = cor;
     document.body.classList.toggle('sem-daemon', !socket || socket.readyState > 1);
-  }, 1000);
+  };
+  // Assim que houver o que mostrar, e não só depois do primeiro segundo. Com
+  // `setInterval` sozinho, a janela abria exibindo o texto escrito no HTML por
+  // um segundo inteiro -- anunciava "sozinha" justamente enquanto conectava, em
+  // toda abertura. O indicador existe para não confundir desconectada com
+  // ociosa, e o atraso fazia dele a própria fonte da confusão.
+  //
+  // No DOMContentLoaded, e não aqui direto: este script inline roda durante a
+  // análise do documento, antes do `lea-presence.js`, que é `defer`. Chamar
+  // agora leria um `window.LeaPresence` que ainda não existe e repetiria o bug
+  // -- escrevendo "sozinha" com outra mão.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mostrar);
+  } else {
+    mostrar();
+  }
+  setInterval(mostrar, 1000);
 })();
 </script>
 </body></html>

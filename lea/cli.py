@@ -461,6 +461,10 @@ def daemon(
         )
 
     console.print(f"[cyan]lea[/] {__version__} · http://{bind_host}:{bind_port}")
+    # O endereço cru não serve para abrir a interface: `/app/` sem token vira
+    # protótipo mudo. Dizer o comando aqui é o único momento em que a pessoa
+    # está olhando.
+    console.print("interface: [cyan]lea dashboard[/] · janela da LEA: [cyan]lea avatar[/]")
     uvicorn.run(
         "lea.server.app:app",
         host=bind_host,
@@ -529,8 +533,9 @@ def hook(
         logging.getLogger(__name__).debug("hook %s não entregue: %s", event, exc)
         raise typer.Exit(0) from None
 
-    body = response.json()
-    decision = body.get("decision") if isinstance(body, dict) else None
+    body = response.json() if isinstance(response.json(), dict) else {}
+
+    decision = body.get("decision")
     if isinstance(decision, dict) and not decision.get("allow", True):
         # O CLI lê stdout: este JSON é o que faz a ferramenta ser recusada.
         # Nada mais pode ir para stdout neste caminho.
@@ -542,7 +547,32 @@ def hook(
         ), ensure_ascii=False))
         raise typer.Exit(0)
 
-    console.print_json(data=body)
+    # stdout de um hook é canal de protocolo, não lugar de relatório.
+    #
+    # Isto imprimia o corpo inteiro da resposta -- `{"ok": true, "event": ...,
+    # "context": ...}` --, forma que nenhum dos dois CLIs lê. O efeito: o bloco
+    # de memória que o daemon calcula no SessionStart era computado, devolvido,
+    # impresso... e descartado. A injeção de contexto da Fase 2 estava inerte
+    # nos backends de CLI, e nada no código dizia isso, porque o dado chegava
+    # certo até a última linha.
+    #
+    # O formato correto foi conferido em 2026-11-09 contra o hook do ai-memory
+    # rodando nesta máquina, que injeta contexto e funciona: o CLI lê
+    # `hookSpecificOutput.additionalContext`.
+    contexto = body.get("context")
+    if event == "SessionStart" and isinstance(contexto, str) and contexto.strip():
+        print(json.dumps({
+            "hookSpecificOutput": {
+                "hookEventName": "SessionStart",
+                "additionalContext": contexto,
+            }
+        }, ensure_ascii=False))
+        raise typer.Exit(0)
+
+    # Nada a dizer ao CLI: silêncio. Um hook que escreve JSON desconhecido em
+    # stdout, a cada ferramenta usada, é ruído que o CLI pode marcar como falha.
+    # O que serve para depurar vai para o log, que é stderr.
+    logging.getLogger(__name__).debug("hook %s: %s", event, body)
 
 
 @app.command()
@@ -847,6 +877,39 @@ def open_avatar(
         err_console.print(f"[red]{exc}[/]")
         console.print("Enquanto isso: [cyan]lea avatar --browser[/]")
         raise typer.Exit(1) from None
+
+
+@app.command("dashboard")
+def open_dashboard(
+    print_only: bool = typer.Option(
+        False, "--url", help="Só imprime o endereço, sem abrir navegador."
+    ),
+) -> None:
+    """Abre o dashboard no navegador, já ligado ao daemon.
+
+    Abrir `/app/` à mão entrega uma página **sem token**: o `lea-presence.js`
+    não encontra configuração, não abre o websocket e o chat responde
+    localmente. E como o protótipo renderiza inteiro, a interface parece
+    funcionar sem falar com o daemon em momento nenhum -- não havia erro à
+    vista, só ausência de ligação.
+
+    A janela da LEA sempre teve esse caminho, porque `lea avatar` monta a URL
+    com o token. O dashboard não tinha equivalente; este comando é ele.
+    """
+    import webbrowser
+
+    from lea import desktop
+
+    url = desktop.dashboard_url()
+    if "token=" not in url:
+        err_console.print(
+            "[yellow]sem token da interface[/] — rode `lea doctor` para criá-lo."
+        )
+    console.print(url)
+    if print_only:
+        return
+    webbrowser.open(url)
+    console.print("aberto no navegador.")
 
 
 # ── frota ────────────────────────────────────────────────────────────────

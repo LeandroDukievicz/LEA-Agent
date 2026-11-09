@@ -34,7 +34,7 @@ homelab e trocar a camada visual sem mexer no produto.
 | ✅ Fase 1 | núcleo: config, banco com migrações, barramento de eventos, CLI, tokens locais, scanner de injeção |
 | ✅ Fase 2 | memória: wiki git, busca FTS, decaimento, grafo, injeção de contexto, servidor MCP |
 | ✅ Fase 3 | projetos, launcher, adaptadores de harness (Claude Code, Codex, agy), hooks, PTY, worktrees, frota |
-| ✅ Fase 4 | handoffs: geração no Stop, claim, injeção no contexto |
+| ✅ Fase 4 | handoffs: geração no `SessionEnd`, claim, injeção no contexto |
 | ✅ Fase 5 | lea-agent, skills, cron e **aprovação humana nos backends de CLI** (hook `PreToolUse`) |
 | ✅ Fase 6 | bots Telegram e Discord com allowlist e rotas por projeto |
 | 🟡 Fase 7 | custo estimado da Anthropic API; wheel já leva a interface, instalador do SO pendente |
@@ -49,8 +49,14 @@ Requer Python 3.12+ e [uv](https://docs.astral.sh/uv/).
 uv sync --extra dev
 uv run lea doctor      # confere instalação, permissões e banco
 uv run lea daemon      # sobe o núcleo em 127.0.0.1:7420
-uv run pytest          # 254 testes (unidade + aceite)
+uv run lea dashboard   # abre a interface, já ligada ao daemon
+uv run pytest          # 291 testes (unidade + aceite)
 ```
+
+Abra a interface por `lea dashboard`, e não digitando `/app/` no navegador: o
+endereço cru entrega a página **sem token**, e aí ela não acha configuração, não
+abre o websocket e o chat responde localmente. Como o protótipo renderiza
+inteiro, parece funcionar — e não fala com o daemon em momento nenhum.
 
 Testes de aceite exercitam o LEA pela borda — HTTP, WebSocket, MCP por stdio,
 processos reais sob PTY — e verificam o critério de cada fase:
@@ -73,6 +79,7 @@ lea reindex    reconstrói o índice da memória a partir do git
 lea run        executa uma tarefa via Codex CLI, Claude Code ou Anthropic API
 lea fleet      sobe, acompanha e encerra a frota de três agentes
 lea avatar     abre a LEA numa janela própria, fora do navegador
+lea dashboard  abre o dashboard no navegador, já ligado ao daemon
 lea doctor     diagnostica a instalação
 ```
 

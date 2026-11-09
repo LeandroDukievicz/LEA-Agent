@@ -50,17 +50,37 @@ NO_GUI_BACKEND = (
 )
 
 
-def avatar_url(token: str | None = None) -> str:
-    """URL da página da LEA no daemon.
+def page_url(page: str, token: str | None = None) -> str:
+    """URL de uma página da interface no daemon, com o token na query.
 
     O token viaja na query e some da URL no primeiro carregamento: a página o
     guarda e reescreve o endereço. Mesma decisão que o websocket do daemon já
     toma, e pelo mesmo motivo -- a URL não sai desta máquina.
     """
     config = load()
-    base = f"http://{config.server.host}:{config.server.port}/app/avatar.html"
+    base = f"http://{config.server.host}:{config.server.port}/app/{page}"
     token = token if token is not None else tokens.ui_token()
     return f"{base}?{urlencode({'token': token})}" if token else base
+
+
+def avatar_url(token: str | None = None) -> str:
+    """URL da janela da LEA."""
+    return page_url("avatar.html", token)
+
+
+def dashboard_url(token: str | None = None) -> str:
+    """URL do dashboard.
+
+    Sem isto o dashboard era inalcançável como cliente do daemon. Ele é servido
+    em `/app/`, e abrir esse endereço à mão entrega uma página SEM token: o
+    `lea-presence.js` não acha configuração, não abre o websocket e o chat
+    responde localmente. A interface parecia funcionar -- é um protótipo
+    completo, tudo renderiza -- e não falava com o daemon em nenhum momento.
+
+    A janela da LEA tinha o caminho desde o começo, porque `lea avatar` monta a
+    URL com o token. O dashboard não tinha equivalente nenhum.
+    """
+    return page_url("", token)
 
 
 def open_in_browser() -> str:
