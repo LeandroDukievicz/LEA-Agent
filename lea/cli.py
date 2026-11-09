@@ -909,8 +909,14 @@ def _fleet_sessions(only_active: bool = True) -> list[dict[str, Any]]:
 def fleet_up(
     project: int = typer.Option(..., "--project", "-p", help="ID do projeto."),
 ) -> None:
-    """Sobe os três agentes da frota: gerente, implementador e publicador."""
+    """Sobe os três agentes da frota: gerente, implementador e publicador.
+
+    Os três sobem em modo **autônomo**: dado o prompt de papel, cada um resolve
+    o que for necessário sem parar para pedir aprovação. O ponto de controle
+    humano fica na borda, no `pre-push`, que este comando instala.
+    """
     config = load()
+    coleira = _instalar_coleira(project) if config.fleet.leash_publisher else None
     table = Table(title=f"Frota no projeto {project}")
     for column in ("Papel", "Harness", "Sessão", "Worktree"):
         table.add_column(column)
@@ -934,11 +940,56 @@ def fleet_up(
     console.print(
         f"Travas por harness: {flags or 'nenhuma (cada CLI com as próprias defesas)'}"
     )
-    if config.fleet.leash_publisher:
-        console.print("Publicador [green]com coleira[/]: prepara o commit, não dá push.")
+    console.print("Papéis em modo [cyan]autônomo[/]: resolvem sem pedir aprovação.")
+    if coleira:
+        console.print(f"Coleira [green]ativa[/] em {coleira}: push da frota é barrado pelo git.")
+    elif config.fleet.leash_publisher:
+        console.print(
+            "[red]Coleira não instalada[/] — o push da frota NÃO está barrado. "
+            "Rode `lea fleet guard` no repositório."
+        )
     else:
         console.print("Publicador [red]sem coleira[/]: pode publicar sozinho.")
     console.print("Acompanhe em [cyan]lea fleet status[/] ou no dashboard.")
+
+
+def _instalar_coleira(project_id: int) -> str | None:
+    """Instala o `pre-push` no repositório do projeto, e diz onde.
+
+    A coleira é o único ponto de controle humano que sobrou depois de a frota
+    virar autônoma, e até aqui `fleet up` apenas *anunciava* que ela estava
+    ligada -- a instalação era um comando separado que eu nunca havia rodado
+    neste repositório. O aviso era verdadeiro sobre o prompt do publicador e
+    falso sobre o mecanismo: nada barrava o push. Anunciar trava que não existe
+    é pior que não ter trava, porque a pessoa para de conferir.
+    """
+    from pathlib import Path as _Path
+
+    from lea import guard
+
+    # Não existe rota para um projeto só; a listagem é o que há.
+    corpo = _api_call("GET", "/api/projects", tolerate=True) or {}
+    lista = corpo.get("projects", corpo) if isinstance(corpo, dict) else corpo
+    projeto = next(
+        (p for p in lista if isinstance(p, dict) and p.get("id") == project_id), None
+    ) if isinstance(lista, list) else None
+    caminho = (projeto or {}).get("path")
+    if not caminho:
+        err_console.print(f"[yellow]não achei o caminho do projeto {project_id}[/]")
+        return None
+
+    repo = _Path(str(caminho)).expanduser()
+    if not (repo / ".git").exists():
+        err_console.print(f"[yellow]{repo} não é repositório git; coleira não instalada[/]")
+        return None
+
+    report = guard.install(repo)
+    if not report.ok:
+        err_console.print(f"[yellow]coleira não instalada: {report.problem}[/]")
+        return None
+    if report.backup:
+        console.print(f"hook anterior guardado em {report.backup}")
+    return str(report.path)
 
 
 @fleet_commands.command("guard")

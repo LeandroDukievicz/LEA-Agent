@@ -14,7 +14,7 @@ barra a ferramenta **mesmo com ``--dangerously-skip-permissions``**. A flag
 desliga o prompt interativo, não os hooks. É o que torna a supervisão real
 mesmo numa frota rodando solta.
 
-Fluxo, quando o comando casa com um padrão que exige aprovação:
+Fluxo, numa sessão **interativa**, quando o comando casa com um padrão:
 
 1. a ferramenta é recusada e uma aprovação entra na fila;
 2. a pessoa decide (``lea approvals approve``, a API, ou o dashboard);
@@ -23,6 +23,19 @@ Fluxo, quando o comando casa com um padrão que exige aprovação:
 Recusar e deixar repetir, em vez de segurar o hook esperando a decisão: um hook
 pendurado trava o CLI por tempo indeterminado, e o tempo-limite de hook não é
 nosso para definir.
+
+**Autonomia.** Sessão ``autonomous`` -- é como a frota sobe -- não passa por
+essa fila. A diferença é quem está do outro lado: numa sessão interativa a
+pessoa está ali e decide em segundos; numa autônoma não tem ninguém olhando
+naquele instante, e enfileirar não produz decisão a tempo. Produz um agente sem
+a ferramenta, parado, e a pessoa descobrindo horas depois que a tarefa morreu
+esperando. Dado o prompt, o papel resolve o que for necessário.
+
+O controle não desaparece: muda de lugar. Vai para a borda onde o trabalho sai
+da máquina -- o ``pre-push`` de ``lea/guard.py``, que o git executa antes de
+qualquer byte sair e que nenhuma flag de CLI desliga. Travar dentro da máquina
+custa autonomia e não compra segurança; travar na saída custa nada e compra a
+que importa. Por isso ``lea fleet up`` instala a coleira em vez de só anunciá-la.
 """
 
 from __future__ import annotations
@@ -122,10 +135,18 @@ def matched_pattern(tool_name: str, tool_input: Any, patterns: list[str]) -> str
     return None
 
 
-async def _known_session(conn: aiosqlite.Connection, session_id: str) -> bool:
-    """A fila de aprovações referencia `sessions`; o que não está lá não entra."""
-    async with conn.execute("SELECT 1 FROM sessions WHERE id = ?", (session_id,)) as cursor:
-        return await cursor.fetchone() is not None
+async def _session_mode(conn: aiosqlite.Connection, session_id: str) -> str | None:
+    """Modo da sessão, ou None se o LEA não a conhece.
+
+    Serve duas perguntas de uma vez. A fila de aprovações referencia `sessions`,
+    então o que não está lá não entra -- e o modo diz se há alguém esperando
+    para decidir: ``interactive`` tem, ``autonomous`` não.
+    """
+    async with conn.execute(
+        "SELECT mode FROM sessions WHERE id = ?", (session_id,)
+    ) as cursor:
+        row = await cursor.fetchone()
+    return str(row["mode"]) if row is not None else None
 
 
 async def _granted(
@@ -171,6 +192,8 @@ async def decide(
     Criar a aprovação aqui, e não na borda HTTP, mantém a decisão e o registro
     no mesmo lugar: quem recusa é quem enfileira.
 
+    Sessão ``autonomous`` passa e fica registrada: ver "Autonomia" abaixo.
+
     ``gate_external`` decide o que fazer com sessão que o LEA **não** lançou.
     Os hooks são de usuário -- é como os CLIs os expõem --, então instalá-los
     coloca o portão na frente de *todo* terminal da máquina, não só dos agentes
@@ -190,7 +213,23 @@ async def decide(
     if await _granted(conn, session_id, command):
         return {"allow": True, "approved": True}
 
-    nossa = bool(session_id) and await _known_session(conn, session_id)
+    mode = await _session_mode(conn, session_id) if session_id else None
+    nossa = mode is not None
+    if nossa and mode == "autonomous":
+        # Sessão autônoma: ninguém está olhando no instante em que isso
+        # acontece. Enfileirar aqui não produz decisão humana a tempo -- produz
+        # um agente sem a ferramenta, parado, e a pessoa descobrindo horas
+        # depois pela fila. Dado o prompt, o papel resolve o que for preciso.
+        #
+        # O controle não desaparece, muda de lugar: vai para a borda onde o
+        # trabalho sai da máquina, no `pre-push` que o git executa e nenhuma
+        # flag de CLI desliga. Travar dentro da máquina custa autonomia e não
+        # compra segurança; travar na saída custa nada e compra a que importa.
+        logger.info(
+            "portão: %r liberado em sessão autônoma %s", pattern, session_id
+        )
+        return {"allow": True, "autonomous": True, "pattern": pattern}
+
     if not nossa and not gate_external:
         # O LEA supervisiona o que ele lançou. Recusar aqui seria bloquear sem
         # oferecer como liberar.

@@ -101,8 +101,14 @@ class AgentConfig(BaseModel):
     max_tool_rounds: int = Field(default=12, ge=1, le=100)
     max_tokens_per_task: int = Field(default=24000, ge=1000, le=1_000_000)
     command_timeout_seconds: int = Field(default=120, ge=1, le=3600)
+    #: Vale só para sessão **interativa**: a frota sobe autônoma e passa direto.
+    #:
+    #: `curl` e `wget` saíram da lista. Buscar documentação é o que um agente faz
+    #: o tempo todo, e barrar isso não era fronteira de segurança nenhuma -- era
+    #: pedágio no trabalho normal, com o efeito de ensinar a pessoa a aprovar no
+    #: automático. Uma fila que a gente aprova sem ler não protege de nada.
     require_approval_for: list[str] = Field(
-        default_factory=lambda: ["git push", "rm -rf", "sudo", "curl", "wget"]
+        default_factory=lambda: ["git push", "rm -rf", "sudo"]
     )
 
     #: O portão vale também para sessão que o LEA não lançou?

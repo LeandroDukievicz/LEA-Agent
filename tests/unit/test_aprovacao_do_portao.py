@@ -17,8 +17,13 @@ from lea.db import session as db
 
 
 async def _sessao(conn, sid: str, status: str) -> None:
+    """Interativa de propósito: é a que tem alguém do outro lado para decidir.
+
+    Sessão autônoma não enfileira nada, então não teria o que aprovar aqui.
+    """
     await conn.execute(
-        "INSERT INTO sessions (id, harness, status, started_at) VALUES (?, ?, ?, ?)",
+        "INSERT INTO sessions (id, harness, status, mode, started_at) "
+        "VALUES (?, ?, ?, 'interactive', ?)",
         (sid, "claude-code", status, "2026-11-09T00:00:00Z"),
     )
     await conn.commit()

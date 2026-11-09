@@ -205,11 +205,12 @@ do usuário, não chave de provedor de modelo — `OPENAI_API_KEY`, `CODEX_API_K
 > nenhuma completa; aposentar a wiki esvazia duas fases concluídas. A decisão
 > ainda não foi tomada.
 
-## Aprovação humana
+## Aprovação humana, e autonomia
 
-Comandos que casam com `agent.require_approval_for` são **recusados antes de
-acontecer**, em qualquer backend. Nos de CLI isso vem do hook `PreToolUse`, que
-Codex e Claude Code expõem e que roda antes da ferramenta.
+Em sessão **interativa**, comandos que casam com `agent.require_approval_for`
+são **recusados antes de acontecer**, em qualquer backend. Nos de CLI isso vem
+do hook `PreToolUse`, que Codex e Claude Code expõem e que roda antes da
+ferramenta.
 
 ```
 agente tenta `git push`
@@ -218,19 +219,51 @@ agente tenta `git push`
   → o agente tenta de novo e passa
 ```
 
-Verificado ponta a ponta contra um Claude Code de verdade, numa sessão da frota.
-Aprovação pendente de sessão que encerrou é expirada, não fica na fila: pedido
-de quem já não está lá não tem como ser decidido.
+Verificado ponta a ponta contra um Claude Code de verdade. Aprovação pendente de
+sessão que encerrou é expirada, não fica na fila: pedido de quem já não está lá
+não tem como ser decidido.
 
 Recusar e deixar repetir, em vez de pendurar o hook esperando a decisão: um
 hook parado trava o CLI por tempo indeterminado, e o tempo-limite não é nosso
 para definir.
 
-**Isso vale mesmo com as travas soltas.** Verificado contra o CLI real: um
-`permissionDecision: "deny"` barra a ferramenta **mesmo com
+**A recusa funciona mesmo com as travas soltas.** Verificado contra o CLI real:
+um `permissionDecision: "deny"` barra a ferramenta **mesmo com
 `--dangerously-skip-permissions`** — a flag desliga o prompt interativo, não os
 hooks. Uma versão anterior deste README dizia que uma frota solta transformava o
-LEA em gravador de voo; estava errado.
+LEA em gravador de voo; estava errado. Que o LEA *possa* barrar é o que torna a
+escolha abaixo uma escolha, e não uma limitação disfarçada de política.
+
+### A frota é autônoma
+
+`lea fleet up` sobe os três papéis em modo `autonomous`, e o portão respeita
+isso: dado o prompt de papel, cada um resolve o que for necessário sem parar
+para pedir. O padrão que casou vai para o log e para o feed, mas nada é
+enfileirado.
+
+A diferença é quem está do outro lado. Em sessão interativa você está ali e
+decide em segundos. Numa autônoma não tem ninguém olhando naquele instante —
+enfileirar não produz decisão a tempo, produz um agente sem a ferramenta,
+parado, e você descobrindo horas depois que a tarefa morreu esperando.
+
+O controle não desaparece: muda de lugar. Vai para a borda onde o trabalho sai
+da máquina.
+
+```bash
+lea fleet up -p 1
+#   Papéis em modo autônomo: resolvem sem pedir aprovação.
+#   Coleira ativa em …/.git/hooks/pre-push: push da frota é barrado pelo git.
+```
+
+A coleira é instalada pelo próprio `fleet up` quando `fleet.leash_publisher`
+está ligado. Antes ela era só anunciada, e a instalação era um comando separado
+— então o aviso podia ser verdadeiro sobre o prompt do publicador e falso sobre
+o mecanismo. Anunciar trava que não existe é pior que não ter trava.
+
+`curl` e `wget` saíram de `require_approval_for`. Buscar documentação é o que um
+agente faz o tempo todo, e barrar isso não era fronteira de segurança — era
+pedágio, com o efeito de ensinar a aprovar no automático. Uma fila que se aprova
+sem ler não protege de nada.
 
 ### O portão vale para as sessões do LEA
 

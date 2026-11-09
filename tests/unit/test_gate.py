@@ -114,13 +114,48 @@ async def test_sessao_sem_id_nenhum_segue_a_mesma_regra(db_path):
     assert travado["allow"] is False
 
 
+async def test_sessao_autonoma_resolve_sem_pedir(db_path):
+    """Dado o prompt, o papel resolve o que for necessário.
+
+    É como a frota sobe. A diferença com a sessão interativa é quem está do
+    outro lado: ali a pessoa decide em segundos, aqui não tem ninguém olhando
+    naquele instante. Enfileirar não produz decisão a tempo -- produz agente sem
+    a ferramenta, parado, e a pessoa descobrindo horas depois pela fila.
+
+    O controle não desaparece, muda de lugar: vai para o `pre-push`, que o git
+    executa antes de qualquer byte sair e nenhuma flag de CLI desliga.
+    """
+    from lea.agent import list_approvals
+    from lea.db import session as db
+
+    async with db.connection(db_path) as conn:
+        await conn.execute(
+            "INSERT INTO sessions (id, harness, status, mode, started_at) "
+            "VALUES (?, ?, 'active', 'autonomous', ?)",
+            ("s-frota", "claude-code", "2026-11-09T00:00:00Z"),
+        )
+        await conn.commit()
+
+        veredito = await gate.decide(
+            conn, session_id="s-frota", tool_name="Bash",
+            tool_input={"command": "sudo systemctl restart x"}, patterns=["sudo"],
+        )
+        assert veredito["allow"] is True
+        assert veredito["autonomous"] is True
+        assert veredito["pattern"] == "sudo"      # passou, mas identificado
+
+        # E nada foi para a fila: pedido que ninguém vai ler é só ruído.
+        assert await list_approvals(conn, "pending") == []
+
+
 async def test_sessao_conhecida_enfileira_e_a_segunda_tentativa_passa(db_path):
     """Recusar e deixar repetir, em vez de pendurar o hook esperando a pessoa."""
     from lea.db import session as db
 
     async with db.connection(db_path) as conn:
         await conn.execute(
-            "INSERT INTO sessions (id, harness, status, started_at) VALUES (?, ?, 'active', ?)",
+            "INSERT INTO sessions (id, harness, status, mode, started_at) "
+            "VALUES (?, ?, 'active', 'interactive', ?)",
             ("s-teste", "claude-code", "2026-11-08T00:00:00Z"),
         )
         await conn.commit()

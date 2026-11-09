@@ -42,6 +42,20 @@ Enquanto o LEA não tem release, cada entrada é uma fase da especificação.
   então barrava um `echo` que citasse o padrão, um `grep` procurando por ele na
   documentação ou um CLI recebendo a expressão como prompt. Agora compara token
   a token, no começo de cada comando da linha.
+- **A frota é autônoma.** `lea fleet up` sobe os três papéis em modo
+  `autonomous`, e o portão respeita isso: dado o prompt de papel, cada um
+  resolve o que for necessário sem parar para pedir. O padrão que casou vai para
+  o log e para o feed, mas nada é enfileirado — numa sessão em que ninguém está
+  olhando no instante da ação, enfileirar não produz decisão a tempo, produz
+  agente sem a ferramenta e parado. O controle muda de lugar, para a borda onde
+  o trabalho sai da máquina.
+- **`fleet up` instala a coleira**, em vez de só anunciá-la. A instalação era um
+  comando separado, então o aviso "Publicador com coleira" podia ser verdadeiro
+  sobre o prompt e falso sobre o mecanismo — e era: neste repositório não havia
+  `pre-push` nenhum. Quando não dá para instalar, o aviso agora diz isso em
+  vermelho.
+- `curl` e `wget` saíram de `require_approval_for`. Buscar documentação não é
+  fronteira de segurança; era pedágio, e pedágio ensina a aprovar sem ler.
 - **`Stop` não encerra mais a sessão; `SessionEnd` encerra.** Nos dois CLIs o
   `Stop` dispara quando o agente termina de *responder*. O LEA instalava só ele
   e o tratava como fim, então toda sessão de CLI era marcada como encerrada

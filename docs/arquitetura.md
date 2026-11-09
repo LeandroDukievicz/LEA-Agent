@@ -162,11 +162,18 @@ Codex CLI; cada tarefa ou automação pode escolher `codex`, `claude-code` ou
 usam suas autenticações locais. O Codex roda em sandbox `workspace-write` com
 revisão automática de permissões. O Claude Code roda no modo `auto`, e prompts
 que exigiriam interação são negados. As regras `require_approval_for` são
-aplicadas diretamente às ferramentas do modo API; nos modos CLI, o LEA instala
-os padrões configurados como regras temporárias de bloqueio nativas do Codex e
-negações nativas do Bash do Claude Code. Uma ação protegida é recusada na
-execução CLI, pois ainda não existe fluxo interativo para encaminhá-la a uma
-pessoa.
+aplicadas diretamente às ferramentas do modo API; nos modos CLI elas passaram a
+valer pelo hook `PreToolUse`, que roda antes da ferramenta e pode recusá-la --
+inclusive com `--dangerously-skip-permissions` ativo, porque a flag desliga o
+prompt interativo e não os hooks. A ação recusada entra na fila de aprovação, a
+pessoa decide, e a tentativa seguinte passa.
+
+Isso vale para sessão **interativa**. Sessão `autonomous` -- é como `lea fleet
+up` sobe os três papéis -- passa direto, registrando o padrão que casou: não há
+ninguém olhando no instante em que a ação acontece, então enfileirar não produz
+decisão a tempo, produz um agente sem a ferramenta e parado. Para a frota o
+ponto de controle é o `pre-push` que `lea fleet up` instala, executado pelo git
+antes de qualquer byte sair e imune a flag de CLI.
 `POST /api/agent/runs` e `POST /api/automations` aceitam `backend`; se ausente,
 valem `agent.default_backend`.
 

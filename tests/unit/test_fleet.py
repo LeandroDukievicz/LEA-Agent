@@ -68,10 +68,16 @@ def test_marca_nao_casa_com_sessao_de_fora():
     assert not fleet.is_fleet_session(None)
 
 
-def test_payload_pede_sessao_interativa_no_projeto_certo():
+def test_payload_pede_sessao_autonoma_no_projeto_certo():
+    """Autônoma, e o portão lê isso: o papel resolve sem parar para pedir.
+
+    Numa sessão em que ninguém está olhando na hora, enfileirar aprovação não
+    produz decisão humana a tempo -- produz agente sem a ferramenta, parado, e
+    a pessoa descobrindo depois que a tarefa morreu esperando.
+    """
     payload = fleet.payload_for(fleet.get("gerente"), project_id=7)
     assert payload["project_id"] == 7
-    assert payload["mode"] == "interactive"
+    assert payload["mode"] == "autonomous"
     # Flags NUNCA viajam no corpo: quem as aplica é o servidor, pelo config.
     assert "extra_args" not in payload
     assert "flags" not in payload
@@ -139,3 +145,62 @@ def test_rotulo_do_projeto_aceita_objeto_e_texto():
     assert _project_label({"id": 7}) == "7"
     assert _project_label(None) == "—"
     assert _project_label("avulso") == "avulso"
+
+
+def test_subir_a_frota_e_a_coleira_sao_o_mesmo_ato():
+    """Depois de a frota virar autônoma, a coleira é o único controle humano.
+
+    `fleet up` apenas *anunciava* "Publicador com coleira"; instalar era um
+    comando separado, `lea fleet guard`, que eu nunca havia rodado neste
+    repositório -- não existia `pre-push` nenhum. O aviso era verdadeiro sobre o
+    prompt do publicador e falso sobre o mecanismo, e anunciar trava que não
+    existe é pior que não ter trava, porque a pessoa para de conferir.
+
+    O que este teste prende é que a instalação esteja no caminho de subir a
+    frota, e não ao lado dele.
+    """
+    import inspect
+
+    from lea.cli import fleet_up
+
+    fonte = inspect.getsource(fleet_up)
+    assert "_instalar_coleira" in fonte
+    assert "leash_publisher" in fonte
+
+
+def test_a_coleira_instala_no_repositorio_do_projeto(tmp_path, monkeypatch):
+    """E devolve onde instalou, que é o que o aviso de `fleet up` mostra."""
+    import subprocess
+
+    from lea import cli
+
+    repo = tmp_path / "proj"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    monkeypatch.setattr(
+        cli, "_api_call", lambda *a, **k: {"projects": [{"id": 3, "path": str(repo)}]}
+    )
+
+    destino = cli._instalar_coleira(3)
+    assert destino == str(repo / ".git" / "hooks" / "pre-push")
+    assert (repo / ".git" / "hooks" / "pre-push").exists()
+
+
+def test_sem_repositorio_git_a_coleira_avisa_em_vez_de_fingir(tmp_path, monkeypatch):
+    """Devolver None é o que faz `fleet up` avisar que o push NÃO está barrado.
+
+    Silêncio aqui reproduziria o defeito original ao contrário: frota solta com
+    aviso de frota presa.
+    """
+    from lea import cli
+
+    pasta = tmp_path / "sem-git"
+    pasta.mkdir()
+    monkeypatch.setattr(
+        cli, "_api_call", lambda *a, **k: {"projects": [{"id": 4, "path": str(pasta)}]}
+    )
+    assert cli._instalar_coleira(4) is None
+
+    # Projeto que a listagem não conhece também não pode virar instalação muda.
+    monkeypatch.setattr(cli, "_api_call", lambda *a, **k: {"projects": []})
+    assert cli._instalar_coleira(99) is None
