@@ -361,6 +361,7 @@ async def receive_hook(event_name: str, request: Request) -> dict[str, Any]:
             tool_input=payload.get("tool_input"),
             patterns=config.agent.require_approval_for,
             harness=str(payload.get("harness") or ""),
+            gate_external=config.agent.gate_external_sessions,
         )
         response["decision"] = verdict
         if not verdict["allow"]:

@@ -105,6 +105,21 @@ class AgentConfig(BaseModel):
         default_factory=lambda: ["git push", "rm -rf", "sudo", "curl", "wget"]
     )
 
+    #: O portão vale também para sessão que o LEA não lançou?
+    #:
+    #: Os hooks são de usuário -- é assim que os CLIs os expõem --, então
+    #: instalá-los coloca o portão na frente de TODO terminal da máquina. Para
+    #: sessão de fora não existe fila de aprovação: `agent_approvals.session_id`
+    #: referencia `sessions`, e a sessão não está lá. Recusar ali seria bloqueio
+    #: sem saída -- nada a aprovar, nenhum override, em trabalho que nada tem a
+    #: ver com a frota. O padrão é deixar passar -- o evento continua indo para
+    #: o feed ao vivo, que é todo o registro possível sem a sessão no banco.
+    #:
+    #: Ligar isto recusa essas chamadas também. O único destrave passa a ser
+    #: editar este campo, e é só o que faz sentido: quem quer a máquina inteira
+    #: sob trava não quer um atalho de liberação dentro da sessão travada.
+    gate_external_sessions: bool = False
+
 
 class FleetConfig(BaseModel):
     """A frota de três agentes que `lea fleet up` sobe de uma vez.

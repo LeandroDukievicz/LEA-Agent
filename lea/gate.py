@@ -61,17 +61,64 @@ def command_of(tool_input: Any) -> str:
     return ""
 
 
+#: Separadores que encadeiam comandos numa linha de shell. Cada pedaço entre
+#: eles é um comando que pode rodar por conta própria.
+_SEPARATORS = (";", "&&", "||", "|", "\n")
+
+
+def _segments(command: str) -> list[list[str]]:
+    """Quebra a linha em comandos, e cada comando em tokens.
+
+    Comparar token a token, e não por substring, é o que separa *executar* uma
+    ação protegida de apenas *mencioná-la* dentro de um argumento. A versão
+    anterior casava por substring e barrava um ``echo`` que citasse o padrão,
+    um ``grep`` procurando por ele na documentação, ou um CLI recebendo a
+    expressão como prompt -- esta sessão bateu nos três enquanto o consertava.
+    """
+    texto = command
+    for separador in _SEPARATORS:
+        texto = texto.replace(separador, "\n")
+    saida: list[list[str]] = []
+    for parte in texto.split("\n"):
+        parte = parte.strip()
+        if not parte:
+            continue
+        try:
+            saida.append([token.lower() for token in shlex.split(parte)])
+        except ValueError:
+            # Aspas desbalanceadas: o shlex desiste. Quebrar por espaço é
+            # impreciso, mas preserva o nome do comando no primeiro token, que
+            # é o que o padrão compara -- e erra para o lado de barrar. Tratar
+            # a linha como um token único, como eu tinha feito antes, erra para
+            # o lado de LIBERAR, que num portão é o lado errado.
+            saida.append([token.lower() for token in parte.split()])
+    return saida
+
+
 def matched_pattern(tool_name: str, tool_input: Any, patterns: list[str]) -> str | None:
     """Padrão que esta chamada viola, ou None se ela pode seguir."""
     if tool_name.lower() in _READ_ONLY:
         return None
-    command = command_of(tool_input).lower()
-    if not command:
+    command = command_of(tool_input)
+    if not command.strip():
         return None
+
+    segmentos = _segments(command)
     for pattern in patterns:
-        needle = pattern.strip().lower()
-        if needle and needle in command:
-            return pattern.strip()
+        alvo = pattern.strip().lower()
+        if not alvo:
+            continue
+        try:
+            tokens = shlex.split(alvo)
+        except ValueError:
+            tokens = alvo.split()
+        if not tokens:
+            continue
+        # O padrão precisa ser o COMEÇO de um comando: casa com a ação sendo
+        # executada, não com o nome dela aparecendo num argumento.
+        for segmento in segmentos:
+            if segmento[: len(tokens)] == tokens:
+                return pattern.strip()
     return None
 
 
@@ -116,12 +163,24 @@ async def decide(
     tool_input: Any,
     patterns: list[str],
     harness: str = "",
+    gate_external: bool = False,
 ) -> dict[str, Any]:
     """Veredito do portão para uma chamada de ferramenta.
 
     Devolve ``{"allow": True}`` ou ``{"allow": False, "reason": ..., "approval_id": ...}``.
     Criar a aprovação aqui, e não na borda HTTP, mantém a decisão e o registro
     no mesmo lugar: quem recusa é quem enfileira.
+
+    ``gate_external`` decide o que fazer com sessão que o LEA **não** lançou.
+    Os hooks são de usuário -- é como os CLIs os expõem --, então instalá-los
+    coloca o portão na frente de *todo* terminal da máquina, não só dos agentes
+    do LEA. E para essas sessões a fila de aprovação não existe: ela referencia
+    `sessions`, e a sessão não está lá. O resultado era bloqueio sem saída:
+    recusa sem nada a aprovar, sem override, em trabalho que nada tem a ver com
+    a frota. O padrão é deixar passar -- o evento ainda vai para o feed ao
+    vivo, que é todo o registro possível sem a sessão no banco. Ligar isto
+    recusa também essas chamadas, e aí o único destrave é editar o config: quem
+    quer a máquina inteira sob trava não quer um atalho dentro dela.
     """
     pattern = matched_pattern(tool_name, tool_input, patterns)
     if pattern is None:
@@ -131,6 +190,18 @@ async def decide(
     if await _granted(conn, session_id, command):
         return {"allow": True, "approved": True}
 
+    nossa = bool(session_id) and await _known_session(conn, session_id)
+    if not nossa and not gate_external:
+        # O LEA supervisiona o que ele lançou. Recusar aqui seria bloquear sem
+        # oferecer como liberar.
+        logger.info(
+            "portão: %r casou em sessão de fora (%s); liberado por "
+            "agent.gate_external_sessions=false",
+            pattern,
+            session_id or "sem id",
+        )
+        return {"allow": True, "external": True, "pattern": pattern}
+
     import secrets
 
     from lea.agent import _now
@@ -138,14 +209,12 @@ async def decide(
     approval_id = f"approval-{secrets.token_hex(8)}"
     reason = f"comando corresponde ao padrão {pattern!r}"
     # A fila só aceita sessão que o LEA conhece: `agent_approvals.session_id` é
-    # chave estrangeira, e uma sessão que a pessoa abriu no terminal por fora
-    # faria o INSERT estourar. Sem o teste, o erro subia como 500, o `lea hook`
-    # caía na falha-aberta e TODO comando passava em qualquer sessão de fora --
-    # ou seja, o portão ficava desligado exatamente onde mais parecia ligado.
-    #
-    # Não registrar não é liberar: a recusa vale igual. Não saber de quem é a
-    # sessão é motivo para barrar, nunca para deixar passar.
-    if session_id and await _known_session(conn, session_id):
+    # chave estrangeira, e uma sessão aberta por fora faria o INSERT estourar.
+    # Sem este teste o erro subia como 500, o `lea hook` caía na falha-aberta e
+    # todo comando passava -- o portão ficava desligado onde mais parecia
+    # ligado. Chegar aqui com sessão desconhecida só acontece com
+    # `gate_external` ligado; aí recusamos sem fila, que é o trato declarado.
+    if nossa:
         await conn.execute(
             "INSERT INTO agent_approvals "
             "(id, session_id, backend, tool_name, input_json, reason, status, requested_at) "

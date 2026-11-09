@@ -223,6 +223,27 @@ para definir.
 hooks. Uma versão anterior deste README dizia que uma frota solta transformava o
 LEA em gravador de voo; estava errado.
 
+### O portão vale para as sessões do LEA
+
+Os hooks são **de usuário** — é a única forma como os CLIs os expõem. Instalá-los
+coloca o portão na frente de *todo* terminal da máquina, não só dos agentes da
+frota. E para uma sessão que o LEA não lançou não existe fila de aprovação: ela
+referencia `sessions`, e a sessão não está lá. Recusar ali seria bloqueio sem
+saída — nada a aprovar, nenhum override, em trabalho que nada tem a ver com a
+frota. Aconteceu nesta máquina: o primeiro `git push` barrado foi o de quem
+estava escrevendo o portão.
+
+Então o padrão é deixar passar e registrar no feed:
+
+```toml
+[agent]
+gate_external_sessions = false   # padrão: só o que o LEA lançou passa pelo portão
+```
+
+`true` recusa essas chamadas também, e aí o único destrave é editar este campo —
+que é o que faz sentido: quem quer a máquina inteira sob trava não quer um atalho
+dentro dela.
+
 O `agy` é a exceção: ele não expõe hook nenhum. Para ele a trava vive no git.
 
 ```bash

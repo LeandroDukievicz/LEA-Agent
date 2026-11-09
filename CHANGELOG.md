@@ -38,6 +38,15 @@ Enquanto o LEA não tem release, cada entrada é uma fase da especificação.
   `remember` por JSON-RPC direto, sem dependência nova.
 - **O wheel passa a levar a interface** (`lea/app`). Antes, `pip install` dava
   um daemon servindo `/app` de um diretório inexistente.
+- **O portão passou a distinguir executar de mencionar.** Casava por substring,
+  então barrava um `echo` que citasse o padrão, um `grep` procurando por ele na
+  documentação ou um CLI recebendo a expressão como prompt. Agora compara token
+  a token, no começo de cada comando da linha.
+- **O portão vale para as sessões do LEA** (`agent.gate_external_sessions`,
+  padrão `false`). Os hooks são de usuário, então instalá-los põe o portão na
+  frente de todo terminal da máquina — e para sessão que o LEA não lançou não
+  existe fila de aprovação, porque ela referencia `sessions`. Era bloqueio sem
+  saída. `true` para quem quer a máquina inteira sob trava.
 
 ### Corrigido
 

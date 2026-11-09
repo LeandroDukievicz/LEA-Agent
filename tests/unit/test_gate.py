@@ -45,13 +45,16 @@ def test_recusa_sem_aprovacao_ainda_explica():
     assert "approval-" not in saida["permissionDecisionReason"]
 
 
-async def test_sessao_desconhecida_e_recusada_sem_estourar(db_path):
-    """A fila referencia `sessions`; sessão de fora faria o INSERT estourar.
+async def test_sessao_de_fora_passa_porque_nao_ha_como_aprovar(db_path):
+    """Os hooks são de usuário: o portão fica na frente de todo terminal.
 
-    Essa era a falha: o erro subia como HTTP 500, o `lea hook` caía na
-    falha-aberta e TODO comando passava em qualquer sessão que o LEA não tenha
-    lançado -- a maioria delas. O portão ficava desligado exatamente onde mais
-    parecia ligado. Não registrar não é liberar.
+    Verificado nesta máquina: instalados os hooks, o primeiro `git push` barrado
+    foi o de quem estava *escrevendo o portão*, numa sessão que o LEA não
+    lançou. E ali não há saída -- a fila referencia `sessions`, a sessão não
+    está lá, então não existe aprovação para conceder. Recusa sem nada a
+    aprovar não é supervisão: é a máquina parada.
+
+    O LEA supervisiona o que ele lançou.
     """
     from lea.db import session as db
 
@@ -63,9 +66,52 @@ async def test_sessao_desconhecida_e_recusada_sem_estourar(db_path):
             tool_input={"command": "git push origin main"},
             patterns=["git push"],
         )
+    assert veredito["allow"] is True
+    assert veredito["external"] is True
+    assert veredito["pattern"] == "git push"        # passou, mas identificado
+
+
+async def test_sessao_de_fora_e_recusada_quando_a_trava_e_geral(db_path):
+    """`gate_external_sessions` troca o padrão: tudo na máquina sob trava.
+
+    Continua sem fila -- a chave estrangeira não deixa --, e é por isso que o
+    teste cobra `approval_id is None`. Sem o teste de sessão conhecida, este
+    INSERT estouraria, o erro subiria como HTTP 500, o `lea hook` cairia na
+    falha-aberta e TODO comando passaria: o portão ficava desligado exatamente
+    onde mais parecia ligado.
+    """
+    from lea.db import session as db
+
+    async with db.connection(db_path) as conn:
+        veredito = await gate.decide(
+            conn,
+            session_id="sessao-que-o-lea-nunca-abriu",
+            tool_name="Bash",
+            tool_input={"command": "git push origin main"},
+            patterns=["git push"],
+            gate_external=True,
+        )
     assert veredito["allow"] is False
     assert veredito["approval_id"] is None          # não enfileirou...
     assert "git push" in veredito["reason"]         # ...mas recusou igual
+
+
+async def test_sessao_sem_id_nenhum_segue_a_mesma_regra(db_path):
+    """Hook sem `session_id` é sessão de fora: não há como ser nossa."""
+    from lea.db import session as db
+
+    async with db.connection(db_path) as conn:
+        solto = await gate.decide(
+            conn, session_id=None, tool_name="Bash",
+            tool_input={"command": "sudo rm /x"}, patterns=["sudo"],
+        )
+        travado = await gate.decide(
+            conn, session_id=None, tool_name="Bash",
+            tool_input={"command": "sudo rm /x"}, patterns=["sudo"],
+            gate_external=True,
+        )
+    assert solto["allow"] is True
+    assert travado["allow"] is False
 
 
 async def test_sessao_conhecida_enfileira_e_a_segunda_tentativa_passa(db_path):
