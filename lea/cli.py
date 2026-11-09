@@ -262,14 +262,18 @@ def list_pending_approvals() -> None:
     table.add_column("Tarefa")
     table.add_column("Comando")
     table.add_column("Motivo")
+    # Duas formas de entrada chegam aqui. O backend anthropic-api grava `argv`,
+    # porque executa sem shell; o portão dos CLIs grava `command`, porque é uma
+    # linha de shell que ele nem montou. Esta tela só entendia a primeira, e por
+    # isso TODA aprovação vinda de Codex ou Claude Code aparecia como
+    # "(inválido)": a pessoa era chamada a aprovar um comando que a tela não
+    # mostrava. `gate.command_of` lê as duas, e devolve o mesmo texto que o
+    # portão casou contra o padrão -- aprovar o que se vê.
+    from lea import gate
+
     for approval in approvals:
         command_input = approval.get("input") or {}
-        argv = command_input.get("argv")
-        command = (
-            shlex.join(argv)
-            if isinstance(argv, list) and all(isinstance(arg, str) for arg in argv)
-            else "(inválido)"
-        )
+        command = gate.command_of(command_input) or "(sem comando)"
         cwd = command_input.get("cwd")
         if cwd:
             command = f"{command} · cwd={cwd}"
@@ -277,11 +281,37 @@ def list_pending_approvals() -> None:
             str(approval["id"]),
             str(approval["session_id"]),
             str(approval.get("project_slug") or approval.get("project_id") or "—"),
-            str(approval.get("task") or "—"),
+            _primeira_linha(approval.get("task")),
             command,
             str(approval["reason"]),
         )
     console.print(table)
+
+    # A tabela encurta o id quando a janela aprema, e o id é justamente o que a
+    # pessoa precisa digitar de volta. Uma tela que pede decisão e esconde como
+    # tomá-la não serve: as linhas abaixo saem prontas para colar.
+    console.print()
+    for approval in approvals:
+        comando = gate.command_of(approval.get("input") or {})
+        sufixo = f"   [dim]# {comando}[/dim]" if comando else ""
+        console.print(f"lea approvals approve {approval['id']}{sufixo}")
+
+
+def _primeira_linha(texto: Any, limite: int = 44) -> str:
+    """Primeira linha útil de um texto longo, para caber numa célula.
+
+    A tarefa de uma sessão da frota é o prompt de papel inteiro -- umas quarenta
+    linhas. Impresso cru, uma aprovação pendente enchia o terminal e escondia as
+    colunas que importam, justamente quando a frota está de pé, que é a única
+    hora em que esta tela serve para algo.
+    """
+    if not texto:
+        return "—"
+    for linha in str(texto).splitlines():
+        linha = linha.strip()
+        if linha:
+            return linha if len(linha) <= limite else linha[: limite - 1] + "…"
+    return "—"
 
 
 @approval_commands.command("approve")
@@ -456,7 +486,9 @@ def hook(
     """
     import httpx
 
-    if event not in {"PreToolUse", "SessionStart", "PostToolUse", "PreCompact", "Stop"}:
+    from lea.harnesses.base import LEA_HOOK_EVENTS
+
+    if event not in set(LEA_HOOK_EVENTS):
         err_console.print(f"[red]evento desconhecido:[/] {event}")
         raise typer.Exit(2)
 

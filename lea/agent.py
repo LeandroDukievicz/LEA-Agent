@@ -987,21 +987,58 @@ async def resolve_approval(
     if row is None:
         return None
     session_id = str(row["session_id"])
+    # A sessão precisa estar VIVA, não necessariamente pausada.
+    #
+    # Exigir 'paused' vinha do backend anthropic-api, onde quem pede a aprovação
+    # é o próprio laço de ferramentas do LEA: ele pausa a sessão e fica
+    # esperando. O portão dos CLIs não pausa nada -- não pode. O hook recusa a
+    # ferramenta e volta na hora, o CLI segue de pé, e a sessão continua
+    # 'active'. Com a exigência de 'paused', NENHUMA aprovação vinda de Codex ou
+    # Claude Code podia ser aprovada: a metade da recusa funcionava, a da
+    # liberação não existia. O que a trava precisa impedir é decidir sobre
+    # sessão que já acabou, e é isso que ela diz agora.
     cursor = await conn.execute(
         "UPDATE agent_approvals SET status = ?, decided_at = ?, decision_by = ? "
         "WHERE id = ? AND status = 'pending' "
-        "AND EXISTS (SELECT 1 FROM sessions WHERE id = ? AND status = 'paused')",
+        "AND EXISTS (SELECT 1 FROM sessions WHERE id = ? "
+        "            AND status NOT IN ('ended', 'handoff', 'error'))",
         (new_status, _now(), decided_by, approval_id, session_id),
     )
     if cursor.rowcount != 1:
         await conn.commit()
         return None
+    # Retomar só vale para quem estava esperando. Sessão de CLI nunca pausou,
+    # então aqui não há o que mexer -- o agente tenta de novo por conta dele.
     await conn.execute(
         "UPDATE sessions SET status = 'active' WHERE id = ? AND status = 'paused'",
         (session_id,),
     )
     await conn.commit()
     return session_id
+
+
+async def expire_stale_approvals(conn: aiosqlite.Connection) -> int:
+    """Expira aprovação pendente cuja sessão já não está viva.
+
+    No backend ``anthropic-api`` quem pede a aprovação também a expira: o laço
+    de ferramentas espera pela decisão e limpa no ``finally``. O portão dos CLIs
+    não tem esse dono -- ele recusa a ferramenta e volta na hora, sem ninguém
+    esperando. Então a aprovação ficava `pending` para sempre depois de a sessão
+    acabar, e `lea approvals list` enchia de linhas que não dá para decidir,
+    escondendo as que dão. Três delas apareceram em meia hora de frota.
+
+    Expirar, e não apagar: a fila é registro de quem pediu o quê, e uma recusa
+    por abandono conta tanto quanto uma recusa explícita.
+    """
+    cursor = await conn.execute(
+        "UPDATE agent_approvals SET status = 'expired', decided_at = ?, "
+        "decision_by = 'sessão encerrada' "
+        "WHERE status = 'pending' AND session_id IN "
+        "(SELECT id FROM sessions WHERE status IN ('ended', 'handoff', 'error'))",
+        (_now(),),
+    )
+    await conn.commit()
+    return cursor.rowcount or 0
 
 
 async def list_approvals(

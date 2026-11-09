@@ -56,6 +56,7 @@ TRUST_EVENT_NAMES = {
     "PostToolUse": "post_tool_use",
     "PreCompact": "pre_compact",
     "Stop": "stop",
+    "SessionEnd": "session_end",
 }
 
 

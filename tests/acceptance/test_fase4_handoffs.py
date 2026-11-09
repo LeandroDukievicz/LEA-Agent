@@ -54,10 +54,18 @@ async def test_codex_encerra_com_handoff_e_claude_code_assume(
             json={"session_id": codex_sid, "tool_name": tool},
         )
 
-    # 2. Stop gera o handoff
-    corpo = (
+    # 2. Stop é fim de TURNO: o agente respondeu e segue de pé. Nada encerra.
+    turno = (
         await client.post(
             "/hooks/Stop", headers=hook_headers, json={"session_id": codex_sid}
+        )
+    ).json()
+    assert "handoff" not in turno, turno
+
+    # 3. SessionEnd é o fim de verdade, e é ele que gera o handoff.
+    corpo = (
+        await client.post(
+            "/hooks/SessionEnd", headers=hook_headers, json={"session_id": codex_sid}
         )
     ).json()
     assert "handoff" in corpo, corpo
@@ -68,7 +76,7 @@ async def test_codex_encerra_com_handoff_e_claude_code_assume(
     assert "Bash (2x)" in handoff["stopped_at"], handoff["stopped_at"]
     assert handoff["open_items"]
 
-    # 3. sessão marcada, handoff pendente
+    # 4. sessão marcada, handoff pendente
     sessao = (await client.get(f"/api/sessions/{codex_sid}", headers=headers)).json()
     assert sessao["status"] == "handoff"
     pendentes = (
@@ -76,7 +84,7 @@ async def test_codex_encerra_com_handoff_e_claude_code_assume(
     ).json()["handoffs"]
     assert len(pendentes) == 1
 
-    # 4. virou página de wiki citável
+    # 5. virou página de wiki citável
     achados = (
         await client.get(
             "/api/pages", headers=headers, params={"q": handoff["title"][:30]}
@@ -84,7 +92,7 @@ async def test_codex_encerra_com_handoff_e_claude_code_assume(
     ).json()["results"]
     assert any("handoffs/" in a["path"] for a in achados), achados
 
-    # 5. claim pelo Claude Code
+    # 6. claim pelo Claude Code
     nova = await client.post(
         f"/api/handoffs/{handoff['id']}/claim",
         headers=headers,
@@ -94,13 +102,13 @@ async def test_codex_encerra_com_handoff_e_claude_code_assume(
     nova = nova.json()
     assert nova["mode"] == "handoff"
 
-    # 6. o handoff é a PRIMEIRA página do contexto
+    # 7. o handoff é a PRIMEIRA página do contexto
     paginas = nova["memory"]["pages"]
     assert paginas, "contexto vazio"
     assert paginas[0]["reason"] == "handoff assumido", paginas
     assert handoff["id"] in paginas[0]["slug"]
 
-    # 7. e ficou marcado como assumido por essa sessão
+    # 8. e ficou marcado como assumido por essa sessão
     estado = (
         await client.get(f"/api/handoffs/{handoff['id']}", headers=headers)
     ).json()
@@ -131,7 +139,7 @@ async def test_claim_duplo_e_recusado(
 
     handoff = (
         await client.post(
-            "/hooks/Stop",
+            "/hooks/SessionEnd",
             headers=daemon["hook_headers"],
             json={"session_id": sessao["id"]},
         )
@@ -159,7 +167,7 @@ async def test_claim_duplo_e_recusado(
 async def test_handoff_manual_pelo_console(
     daemon: dict, repo_git: Path, harness_falso: None, sem_credencial: None
 ) -> None:
-    """O ``/handoff`` do console usa o mesmo caminho do hook Stop."""
+    """O ``/handoff`` do console usa o mesmo caminho do hook SessionEnd."""
     client, headers = daemon["client"], daemon["headers"]
 
     projeto = (

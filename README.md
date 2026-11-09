@@ -87,9 +87,14 @@ AG Antigravity CLI  1.4.12                 ○      ●    não expõe hooks de 
 ```
 
 `lea harnesses --install claude-code` registra os hooks de ciclo de vida
-(`PreToolUse`, `SessionStart`, `PostToolUse`, `PreCompact`, `Stop`) e o servidor
-MCP de memória. O `PreToolUse` é o que dá ao LEA a aprovação humana: é o único
-que roda antes da ação.
+(`PreToolUse`, `SessionStart`, `PostToolUse`, `PreCompact`, `Stop`, `SessionEnd`)
+e o servidor MCP de memória. O `PreToolUse` é o que dá ao LEA a aprovação
+humana: é o único que roda antes da ação.
+
+`Stop` e `SessionEnd` são eventos **diferentes**, e os dois CLIs os tratam
+assim: `Stop` dispara quando o agente termina de *responder* e volta a acontecer
+na resposta seguinte; `SessionEnd` dispara quando a sessão acaba de verdade. É
+o `SessionEnd` que encerra a sessão no LEA e gera o handoff.
 
 **Isso altera a configuração de outra ferramenta na sua máquina**, então é um
 comando explícito e nunca roda sozinho. Antes de tocar em qualquer arquivo o
@@ -212,6 +217,10 @@ agente tenta `git push`
   → você decide: lea approvals approve <id>
   → o agente tenta de novo e passa
 ```
+
+Verificado ponta a ponta contra um Claude Code de verdade, numa sessão da frota.
+Aprovação pendente de sessão que encerrou é expirada, não fica na fila: pedido
+de quem já não está lá não tem como ser decidido.
 
 Recusar e deixar repetir, em vez de pendurar o hook esperando a decisão: um
 hook parado trava o CLI por tempo indeterminado, e o tempo-limite não é nosso

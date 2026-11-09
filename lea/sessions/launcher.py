@@ -340,6 +340,12 @@ class Launcher:
         )
         await self.conn.commit()
 
+        # Aprovação pendente desta sessão não tem mais como ser decidida: quem
+        # pediu já não está lá para tentar de novo.
+        from lea.agent import expire_stale_approvals
+
+        await expire_stale_approvals(self.conn)
+
         if running.worktree_path:
             # A worktree fica: pode haver trabalho não commitado dentro dela,
             # e apagar automaticamente seria destruir o que a sessão fez. A

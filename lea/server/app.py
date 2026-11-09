@@ -64,7 +64,15 @@ _HOOK_EVENT_TYPES = {
     "PreToolUse": "tool_call",
     "PostToolUse": "tool_call",
     "PreCompact": "memory",
-    "Stop": "session_end",
+    # `Stop` é FIM DE TURNO, não fim de sessão: nos dois CLIs ele dispara quando
+    # o agente termina de responder, e o processo segue de pé esperando a
+    # próxima mensagem. Mapeado como `session_end`, ele marcava a sessão como
+    # encerrada depois da primeira resposta -- verificado na frota: o
+    # implementador trabalhou, respondeu, e virou 'handoff' no banco enquanto o
+    # processo continuava vivo. Daí a tela mentir, o handoff sair no meio do
+    # trabalho e a fila de aprovação ficar indecidível.
+    "Stop": "message",
+    "SessionEnd": "session_end",
 }
 
 HOOK_EVENTS = frozenset(_HOOK_EVENT_TYPES)
@@ -75,7 +83,7 @@ async def _session_exists(conn: aiosqlite.Connection, session_id: str) -> bool:
         return await cursor.fetchone() is not None
 
 
-async def _handoff_on_stop(request: Request, session_id: str) -> dict[str, Any] | None:
+async def _handoff_on_session_end(request: Request, session_id: str) -> dict[str, Any] | None:
     """Gera o handoff quando uma sessão encerra.
 
     Falhar aqui nunca propaga: quem está do outro lado é o agente de código
@@ -298,8 +306,9 @@ async def receive_hook(event_name: str, request: Request) -> dict[str, Any]:
 
     Quem chama é o comando ``lea hook``, rodando dentro do processo do agente
     de código. Todo evento é publicado no barramento; o ``SessionStart``
-    também devolve o bloco de memória a injetar. O ``Stop`` passa a gerar
-    handoff na Fase 4.
+    também devolve o bloco de memória a injetar. O ``SessionEnd`` gera o handoff
+    da Fase 4 -- e é ele, não o ``Stop``, que encerra a sessão: ``Stop`` é fim
+    de turno e volta a acontecer na resposta seguinte.
     """
     if event_name not in HOOK_EVENTS:
         raise HTTPException(status_code=404, detail=f"evento desconhecido: {event_name}")
@@ -332,7 +341,7 @@ async def receive_hook(event_name: str, request: Request) -> dict[str, Any]:
                 json.dumps(body, ensure_ascii=False),
             ),
         )
-        if event_name == "Stop":
+        if event_name == "SessionEnd":
             await request.app.state.db.execute(
                 "UPDATE sessions SET status = 'ended', ended_at = ? WHERE id = ? "
                 "AND status NOT IN ('ended', 'handoff')",
@@ -340,8 +349,11 @@ async def receive_hook(event_name: str, request: Request) -> dict[str, Any]:
             )
         await request.app.state.db.commit()
 
-        if event_name == "Stop":
-            handoff = await _handoff_on_stop(request, session_id)
+        if event_name == "SessionEnd":
+            from lea.agent import expire_stale_approvals
+
+            await expire_stale_approvals(request.app.state.db)
+            handoff = await _handoff_on_session_end(request, session_id)
             if handoff:
                 response_handoff = handoff
 

@@ -42,6 +42,24 @@ Enquanto o LEA não tem release, cada entrada é uma fase da especificação.
   então barrava um `echo` que citasse o padrão, um `grep` procurando por ele na
   documentação ou um CLI recebendo a expressão como prompt. Agora compara token
   a token, no começo de cada comando da linha.
+- **`Stop` não encerra mais a sessão; `SessionEnd` encerra.** Nos dois CLIs o
+  `Stop` dispara quando o agente termina de *responder*. O LEA instalava só ele
+  e o tratava como fim, então toda sessão de CLI era marcada como encerrada
+  depois da primeira resposta, com o agente vivo e trabalhando — a tela mentia,
+  o handoff saía no meio do trabalho e a fila de aprovação daquela sessão ficava
+  indecidível. Visto na frota: o implementador rodou oito ferramentas,
+  respondeu, e virou `handoff` no banco enquanto o processo seguia de pé.
+- **A aprovação do portão passou a poder ser aprovada.** `resolve_approval`
+  exigia sessão `paused`, condição que vem do backend `anthropic-api`, onde o
+  laço de ferramentas pausa e espera. O portão dos CLIs não pausa nada, então
+  `lea approvals approve` respondia "não encontrada" para toda aprovação vinda
+  de Codex ou Claude Code: metade da Fase 5 — a da liberação — nunca funcionou.
+- **A fila de aprovação mostra o comando** e sai com as linhas de `approve`
+  prontas para colar. Vinda do portão, toda aprovação aparecia como
+  `(inválido)`: a tela só entendia a forma `argv` do `anthropic-api`, e pedia
+  uma decisão sobre um comando que não mostrava.
+- **Pendência de sessão encerrada expira.** No `anthropic-api` quem pede também
+  limpa; o portão não tem esse dono, e a pendência sobrevivia à sessão.
 - **O portão vale para as sessões do LEA** (`agent.gate_external_sessions`,
   padrão `false`). Os hooks são de usuário, então instalá-los põe o portão na
   frente de todo terminal da máquina — e para sessão que o LEA não lançou não

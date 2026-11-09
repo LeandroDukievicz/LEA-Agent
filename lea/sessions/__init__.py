@@ -183,11 +183,20 @@ async def reap_orphans(conn: aiosqlite.Connection) -> int:
     """
     async with conn.execute("SELECT id FROM sessions WHERE status = 'active'") as cursor:
         orphans = [row["id"] for row in await cursor.fetchall()]
-    if not orphans:
-        return 0
-    await conn.execute(
-        "UPDATE sessions SET status = 'ended', ended_at = ? WHERE status = 'active'",
-        (_now(),),
-    )
-    await conn.commit()
+    if orphans:
+        await conn.execute(
+            "UPDATE sessions SET status = 'ended', ended_at = ? WHERE status = 'active'",
+            (_now(),),
+        )
+        await conn.commit()
+
+    # A varredura da fila roda mesmo sem órfã: a pendência que sobra é de sessão
+    # que já estava encerrada no banco -- encerrada direito, por `fleet down` ou
+    # pelo `SessionEnd`. Ter saído pela porta da frente é justamente o caso em
+    # que não há órfã para achar, e era o caso em que a limpeza não acontecia.
+    from lea.agent import expire_stale_approvals
+
+    expiradas = await expire_stale_approvals(conn)
+    if expiradas:
+        logger.info("%d aprovação(ões) expirada(s) com a sessão que as pediu", expiradas)
     return len(orphans)

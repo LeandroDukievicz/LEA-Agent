@@ -25,7 +25,19 @@ from typing import Any, Protocol, runtime_checkable
 #: ``PreToolUse`` vem primeiro porque é o único que roda ANTES da ação e pode
 #: recusá-la -- é o que dá ao LEA aprovação humana nos backends de CLI. Sem
 #: ele, o LEA só via o que já tinha acontecido.
-LEA_HOOK_EVENTS: tuple[str, ...] = ("PreToolUse", "SessionStart", "PostToolUse", "PreCompact", "Stop")
+#: `Stop` e `SessionEnd` são eventos DIFERENTES, e confundi-los custou caro:
+#: nos dois CLIs o `Stop` dispara quando o agente termina de *responder*, não
+#: quando a sessão acaba. O LEA instalava só o `Stop` e o tratava como fim --
+#: então toda sessão de CLI era marcada como encerrada depois da primeira
+#: resposta, com o agente vivo e trabalhando. Quem encerra é o `SessionEnd`.
+LEA_HOOK_EVENTS: tuple[str, ...] = (
+    "PreToolUse",
+    "SessionStart",
+    "PostToolUse",
+    "PreCompact",
+    "Stop",
+    "SessionEnd",
+)
 
 
 class Health(str, Enum):
